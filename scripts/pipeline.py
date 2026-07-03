@@ -65,7 +65,7 @@ def cookie_args():
 def list_channel_videos():
     """Return [{"id": ..., "title": ...}, ...] for every video on the channel."""
     out = subprocess.run(
-        ["yt-dlp", *cookie_args(), "--flat-playlist", "-J", CHANNEL_URL],
+        ["yt-dlp", *cookie_args(), "--remote-components", "ejs:github", "--flat-playlist", "-J", CHANNEL_URL],
         check=True, capture_output=True, text=True,
     )
     data = json.loads(out.stdout)
@@ -88,6 +88,7 @@ def download_video(video_id, dest: Path) -> Path:
     out_template = str(dest / f"{video_id}.%(ext)s")
     run([
         "yt-dlp", *cookie_args(),
+        "--remote-components", "ejs:github",
         "-f", "bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/best[height<=1080]",
         "--merge-output-format", "mp4",
         "-o", out_template,
