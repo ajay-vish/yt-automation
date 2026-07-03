@@ -26,6 +26,7 @@ import os
 import random
 import subprocess
 import sys
+from datetime import date
 from pathlib import Path
 
 import librosa
@@ -211,31 +212,20 @@ def upload_private(video_path: Path, placeholder_title: str, source_id: str, sou
 
 
 def write_claude_prompt(source_id: str, source_title: str, transcript: str, uploaded_video_id: str):
-    DRAFTS_DIR.mkdir(exist_ok=True)
-    prompt = f"""Paste everything below into Claude (free tier chat) to get the title, \
-description and tags for this YouTube Short.
+    dated_dir = DRAFTS_DIR / date.today().isoformat()  # e.g. drafts/2026-07-03/
+    dated_dir.mkdir(parents=True, exist_ok=True)
+    prompt = f"""I run a YouTube channel of Bhojpuri folk songs (lokgeet). I've made a Short from this song: "{source_title}" (full video: https://www.youtube.com/watch?v={source_id}).
 
----
-I run a YouTube channel of Bhojpuri folk songs (lokgeet). I've made a Short from this \
-song: "{source_title}" (full video: https://www.youtube.com/watch?v={source_id}).
-
-Here is a rough transcript of the clip used in the Short (Hindi/Bhojpuri, may contain \
-transcription errors):
+Here is a rough transcript of the clip used in the Short (Hindi/Bhojpuri, may contain transcription errors):
 "{transcript.strip()}"
 
 Please give me:
-1. A YouTube Shorts TITLE (under 100 characters) in the format: Song Name – Singer | \
-Bhojpuri Folk Song #Shorts (fix/guess the singer and song name from context if needed)
-2. A YouTube DESCRIPTION (3-5 lines) that includes the song name, a short evocative \
-line about the song, a link placeholder to the full video, and relevant hashtags.
-3. 15-20 YouTube TAGS (comma-separated) mixing broad terms (bhojpuri, folk song, \
-lokgeet, indian folk music) and specific terms (song name, singer name, region).
----
 
-The uploaded draft is private on the channel, video id: {uploaded_video_id}
-Once you have the title/description/tags, edit the video in YouTube Studio and set it to Public.
+A YouTube Shorts TITLE (under 100 characters) in the format: Song Name – Singer | Bhojpuri Folk Song #Shorts (fix/guess the singer and song name from context if needed)
+A YouTube DESCRIPTION (3-5 lines) that includes the song name, a short evocative line about the song, the actual full video link I provided above (not a placeholder), and relevant hashtags.
+15-20 YouTube TAGS (comma-separated) mixing broad terms (bhojpuri, folk song, lokgeet, indian folk music) and specific terms (song name, singer name, region).
 """
-    (DRAFTS_DIR / f"{source_id}_prompt.txt").write_text(prompt, encoding="utf-8")
+    (dated_dir / f"{source_id}_prompt.txt").write_text(prompt, encoding="utf-8")
 
 
 def main():
