@@ -1,0 +1,10 @@
+I run a YouTube channel of Bhojpuri folk songs (lokgeet). I've made a Short from this song: "Pidiya ka Nakata geet | Pidiya Song | Manju Lokgeet" (full video: https://www.youtube.com/watch?v=H-9phwRZiVE).
+
+Here is a rough transcript of the clip used in the Short (Hindi/Bhojpuri, may contain transcription errors):
+"खिचना जबा लगाने मोरे आचाराउ खेची के जबा मरलो चारी जबवडा खेची के जबा मरलो चारी जववडा रोवने जबा लगने"
+
+Please give me:
+
+A YouTube Shorts TITLE (under 100 characters) in the format: Song Name – Singer | Bhojpuri Folk Song #Shorts (fix/guess the singer and song name from context if needed)
+A YouTube DESCRIPTION (3-5 lines) that includes the song name, a short evocative line about the song, the actual full video link I provided above (not a placeholder), and relevant hashtags.
+15-20 YouTube TAGS (comma-separated) mixing broad terms (bhojpuri, folk song, lokgeet, indian folk music) and specific terms (song name, singer name, region).
