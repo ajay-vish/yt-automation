@@ -45,7 +45,7 @@ GIF_PATH = _REPO_ROOT / "assets" / "Subscribe.gif"
 
 # Title overlay settings
 TITLE_FONT = "Noto Sans"          # Fallback to a common system font; change if needed
-TITLE_FONT_SIZE = 26
+TITLE_FONT_SIZE = 52
 TITLE_COLOR = "white"
 TITLE_OUTLINE_COLOR = "black"
 TITLE_OUTLINE_WIDTH = 3
@@ -175,7 +175,7 @@ def cut_and_reframe(video_path: Path, start: float, clip_seconds: int, out_path:
             f"borderw={TITLE_OUTLINE_WIDTH}:"
             f"bordercolor={TITLE_OUTLINE_COLOR}:"
             f"x=(w-text_w)/2:"
-            f"y=80:"
+            f"y=h*0.12:"
             f"line_spacing=10"
             f"[titled]"
         )
@@ -245,7 +245,7 @@ def transcribe_to_srt(clip_video_path: Path, srt_path: Path) -> str:
 def burn_captions(clip_video_path: Path, srt_path: Path, out_path: Path):
     # Force a readable style: white text, black outline, bottom-centered.
     # Use Noto Sans Devanagari for proper Hindi/Bhojpuri script rendering.
-    style = "FontName=Noto Sans Devanagari,FontSize=20,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BorderStyle=1,Outline=3,Alignment=2,MarginV=80"
+    style = "FontName=Noto Sans Devanagari,FontSize=16,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BorderStyle=1,Outline=2,Alignment=2,MarginV=80"
     run([
         "ffmpeg", "-y", "-i", str(clip_video_path),
         "-vf", f"subtitles={srt_path}:force_style='{style}'",
