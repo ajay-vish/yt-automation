@@ -41,14 +41,19 @@ GIF_PATH = _REPO_ROOT / "assets" / "Subscribe.gif"
 
 # Title overlay settings
 TITLE_FONT = "Noto Sans"          # Fallback to a common system font; change if needed
-TITLE_FONT_SIZE = 52
-TITLE_COLOR = "white"
-TITLE_OUTLINE_COLOR = "black"
-TITLE_OUTLINE_WIDTH = 3
-TITLE_Y_START = "h*0.12"          # top of the title block (proportional, avoids the top edge)
+TITLE_FONT_SIZE    = 58                # bigger for impact
+TITLE_COLOR        = "0xFFD700"        # gold / Bollywood yellow
+TITLE_OUTLINE_COLOR = "0x1A0000"       # deep dark red-black outline
+TITLE_OUTLINE_WIDTH = 5               # thick outline for crispness
+TITLE_SHADOW_COLOR  = "0xFF6600@0.85" # warm orange shadow
+TITLE_SHADOW_X      = 4               # shadow offset x
+TITLE_SHADOW_Y      = 4               # shadow offset y
+TITLE_BOX_COLOR     = "0x000000@0.45" # semi-transparent dark pill behind text
+TITLE_BOX_PADDING   = 18             # px padding inside the box
+TITLE_Y_START = "h*0.18"              # a bit lower than before
 TITLE_MAX_LINES = 2               # hard cap so a long title can't overflow the frame
-TITLE_SIDE_MARGIN = 80            # px kept clear on each side (40px * 2) when wrapping
-TITLE_LINE_SPACING = 14           # extra px between wrapped lines, on top of font height
+TITLE_SIDE_MARGIN = 80            # px kept clear on each side when wrapping
+TITLE_LINE_SPACING = 18           # extra px between wrapped lines
 
 # Subscribe GIF timing (seconds into the clip)
 GIF_START = 5
@@ -237,6 +242,9 @@ def cut_and_reframe(video_path: Path, start: float, clip_seconds: int, out_path:
                 f"fontcolor={TITLE_COLOR}:"
                 f"borderw={TITLE_OUTLINE_WIDTH}:"
                 f"bordercolor={TITLE_OUTLINE_COLOR}:"
+                f"shadowx={TITLE_SHADOW_X}:shadowy={TITLE_SHADOW_Y}:"
+                f"shadowcolor={TITLE_SHADOW_COLOR}:"
+                f"box=1:boxcolor={TITLE_BOX_COLOR}:boxborderw={TITLE_BOX_PADDING}:"
                 f"x=(w-text_w)/2:"
                 f"y={y_expr}"
                 f"[{out_label}]"
