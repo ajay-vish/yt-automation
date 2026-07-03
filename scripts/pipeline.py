@@ -39,6 +39,21 @@ DRAFTS_DIR = Path("drafts")
 CLIP_SECONDS = 35
 SHORT_WIDTH, SHORT_HEIGHT = 1080, 1920
 
+# Asset paths (resolved relative to the repo root, one level up from scripts/)
+_REPO_ROOT = Path(__file__).resolve().parent.parent
+GIF_PATH = _REPO_ROOT / "assets" / "Subscribe.gif"
+
+# Title overlay settings
+TITLE_FONT = "Noto Sans"          # Fallback to a common system font; change if needed
+TITLE_FONT_SIZE = 52
+TITLE_COLOR = "white"
+TITLE_OUTLINE_COLOR = "black"
+TITLE_OUTLINE_WIDTH = 3
+
+# Subscribe GIF timing (seconds into the clip)
+GIF_START = 5
+GIF_END = 9  # GIF_START + 4 seconds visible
+
 
 def run(cmd, **kwargs):
     print("+", " ".join(cmd))
@@ -126,20 +141,77 @@ def find_best_window(wav_path: Path, clip_seconds: int) -> float:
     return float(best_start)
 
 
-def cut_and_reframe(video_path: Path, start: float, clip_seconds: int, out_path: Path):
-    """Trim to the window and convert to 9:16 with a blurred, filled background."""
-    vf = (
+def cut_and_reframe(video_path: Path, start: float, clip_seconds: int, out_path: Path, title: str = ""):
+    """Trim to the window and convert to 9:16 with a blurred, filled background.
+
+    Overlays:
+    - Title text at the top (first segment of title split on '|').
+    - Subscribe GIF from GIF_START to GIF_END seconds, centered at the bottom.
+    """
+    # --- Derive display title ---
+    display_title = title.split("|")[0].strip() if title else ""
+    # Escape characters that break FFmpeg drawtext syntax
+    display_title = display_title.replace("'", "\\'").replace(":", "\\:")
+
+    # --- Base: blur background + foreground composite ---
+    base_vf = (
         f"[0:v]trim=start={start}:duration={clip_seconds},setpts=PTS-STARTPTS,"
         f"scale={SHORT_WIDTH}:{SHORT_HEIGHT}:force_original_aspect_ratio=increase,crop={SHORT_WIDTH}:{SHORT_HEIGHT},"
         f"boxblur=20:5[bg];"
         f"[0:v]trim=start={start}:duration={clip_seconds},setpts=PTS-STARTPTS,"
         f"scale={SHORT_WIDTH}:-2[fg];"
-        f"[bg][fg]overlay=(W-w)/2:(H-h)/2[vout]"
+        f"[bg][fg]overlay=(W-w)/2:(H-h)/2[base]"
     )
+
+    # --- Title text overlay at the top ---
+    title_vf = ""
+    if display_title:
+        title_vf = (
+            f"[base]drawtext="
+            f"text='{display_title}':"
+            f"fontfile=/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf:"
+            f"fontsize={TITLE_FONT_SIZE}:"
+            f"fontcolor={TITLE_COLOR}:"
+            f"borderw={TITLE_OUTLINE_WIDTH}:"
+            f"bordercolor={TITLE_OUTLINE_COLOR}:"
+            f"x=(w-text_w)/2:"
+            f"y=80:"
+            f"line_spacing=10"
+            f"[titled]"
+        )
+        last_label = "titled"
+    else:
+        last_label = "base"
+
+    # --- Subscribe GIF overlay at the bottom (GIF_START to GIF_END seconds) ---
+    # The GIF is passed as input[1]; we delay it by GIF_START seconds via setpts,
+    # then enable the overlay only during [GIF_START, GIF_END].
+    gif_vf = (
+        f"[1:v]setpts=PTS-STARTPTS+{GIF_START}/TB[gif];"
+        f"[{last_label}][gif]overlay="
+        f"x=(W-w)/2:"
+        f"y=H-h-160:"
+        f"enable='between(t,{GIF_START},{GIF_END})':"
+        f"eof_action=pass"
+        f"[vout]"
+    )
+
+    # Assemble full filter_complex
+    filter_parts = [base_vf]
+    if title_vf:
+        filter_parts.append(title_vf)
+    filter_parts.append(gif_vf)
+    filter_complex = ";".join(filter_parts)
+
     af = f"[0:a]atrim=start={start}:duration={clip_seconds},asetpts=PTS-STARTPTS[aout]"
+    filter_complex = f"{filter_complex};{af}"
+
     run([
-        "ffmpeg", "-y", "-i", str(video_path),
-        "-filter_complex", f"{vf};{af}",
+        "ffmpeg", "-y",
+        "-i", str(video_path),
+        "-ignore_loop", "0",   # Let FFmpeg read all GIF frames (we control timing via enable/setpts)
+        "-i", str(GIF_PATH),
+        "-filter_complex", filter_complex,
         "-map", "[vout]", "-map", "[aout]",
         "-c:v", "libx264", "-c:a", "aac", "-shortest", str(out_path),
     ])
@@ -243,7 +315,7 @@ def main():
     print(f"Best window starts at {start:.0f}s")
 
     clip_path = WORK_DIR / f"{video_id}_clip.mp4"
-    cut_and_reframe(raw_path, start, CLIP_SECONDS, clip_path)
+    cut_and_reframe(raw_path, start, CLIP_SECONDS, clip_path, title=title)
 
     srt_path = WORK_DIR / f"{video_id}.srt"
     transcript = transcribe_to_srt(clip_path, srt_path)
