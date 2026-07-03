@@ -35,12 +35,7 @@ WORK_DIR = Path("work")
 CLIP_SECONDS = 35
 SHORT_WIDTH, SHORT_HEIGHT = 1080, 1920
 
-# Asset paths (resolved relative to the repo root, one level up from scripts/)
-_REPO_ROOT = Path(__file__).resolve().parent.parent
-GIF_PATH = _REPO_ROOT / "assets" / "Subscribe.gif"
-
-# Title overlay settings
-TITLE_FONT          = "Noto Sans Devanagari" # Use font family name for automatic Latin character fallback
+TITLE_FONT_FILE     = WORK_DIR / "Poppins-Bold.ttf" # Downloaded font supporting both Latin & Hindi without box bugs
 TITLE_FONT_SIZE     = 56                # Clean, premium size
 TITLE_COLOR         = "gold"            # Vibrant gold/yellow
 TITLE_OUTLINE_COLOR = "black"           # High contrast black outline
@@ -48,10 +43,15 @@ TITLE_OUTLINE_WIDTH = 4                 # Crisp text border
 TITLE_SHADOW_COLOR  = "black@0.5"       # Soft drop shadow for depth
 TITLE_SHADOW_X      = 3                 # Shadow offset X
 TITLE_SHADOW_Y      = 3                 # Shadow offset Y
-TITLE_Y_START       = 180               # Centered vertically in the top banner
+TITLE_Y_START       = 205               # Moved 25 more down (originally 180)
 TITLE_MAX_LINES     = 2                 # Hard cap to prevent overflow
 TITLE_SIDE_MARGIN   = 80                # Margin clear of edges
 TITLE_LINE_SPACING  = 16                # Spacing between lines
+
+# Asset paths (resolved relative to the repo root, one level up from scripts/)
+_REPO_ROOT = Path(__file__).resolve().parent.parent
+GIF_PATH = _REPO_ROOT / "assets" / "Subscribe.gif"
+BRANDING_PATH = _REPO_ROOT / "assets" / "Branding.png"
 
 # Subscribe GIF timing (seconds into the clip)
 GIF_START = 5
@@ -144,6 +144,26 @@ def find_best_window(wav_path: Path, clip_seconds: int) -> float:
     return float(best_start)
 
 
+def download_font(dest_path: Path):
+    """Download Poppins-Bold from Google Fonts, which fully supports both
+    Latin and Devanagari characters in a single file to eliminate box characters."""
+    import urllib.request
+    url = "https://github.com/google/fonts/raw/main/ofl/poppins/Poppins-Bold.ttf"
+    print(f"[font] Downloading premium Poppins font from {url}...")
+    try:
+        # Set User-Agent to prevent HTTP 403 Forbidden issues
+        req = urllib.request.Request(
+            url,
+            headers={'User-Agent': 'Mozilla/5.0'}
+        )
+        with urllib.request.urlopen(req) as response, open(dest_path, 'wb') as out_file:
+            out_file.write(response.read())
+        print("[font] Font downloaded successfully.")
+    except Exception as e:
+        print(f"[font] Failed to download font: {e}")
+        raise
+
+
 def _wrap_title(text: str) -> list[str]:
     """Break a long title into up to TITLE_MAX_LINES lines that fit within
     the frame width at TITLE_FONT_SIZE. If it still doesn't fit in
@@ -174,14 +194,14 @@ def cut_and_reframe(video_path: Path, start: float, clip_seconds: int, out_path:
     """Trim to the window and convert to 9:16 with a blurred, filled background.
 
     Overlays:
-    - Symmetrical top and bottom semi-transparent dark banners for master layout.
-    - Title text centered within the top banner.
-    - Subscribe GIF centered within the bottom banner.
+    - Title text at the top (first segment of title split on '|').
+    - Branding permanently displayed at the bottom center.
+    - Subscribe GIF displayed from GIF_START to GIF_END centered above the Branding.
     """
     # --- Derive display title ---
     display_title = title.split("|")[0].strip() if title else ""
 
-    # --- Base: blur background + foreground composite (leaving background colorful/hazy) ---
+    # --- Base: blur background + foreground composite ---
     base_vf = (
         f"[0:v]trim=start={start}:duration={clip_seconds},setpts=PTS-STARTPTS,"
         f"scale={SHORT_WIDTH}:{SHORT_HEIGHT}:force_original_aspect_ratio=increase,crop={SHORT_WIDTH}:{SHORT_HEIGHT},"
@@ -203,7 +223,7 @@ def cut_and_reframe(video_path: Path, start: float, clip_seconds: int, out_path:
             title_vf_parts.append(
                 f"[{prev_label}]drawtext="
                 f"text='{_escape_drawtext(line)}':"
-                f"font='{TITLE_FONT}':"
+                f"fontfile='{str(TITLE_FONT_FILE)}':"
                 f"fontsize={TITLE_FONT_SIZE}:"
                 f"fontcolor={TITLE_COLOR}:"
                 f"borderw={TITLE_OUTLINE_WIDTH}:"
@@ -220,23 +240,37 @@ def cut_and_reframe(video_path: Path, start: float, clip_seconds: int, out_path:
         last_label = "base"
     title_vf = ";".join(title_vf_parts)
 
-    # --- Subscribe GIF overlay at the bottom (GIF_START to GIF_END seconds) ---
-    # The GIF is passed as input[1]; we delay it by GIF_START seconds via setpts,
-    # then enable the overlay only during [GIF_START, GIF_END].
-    gif_vf = (
-        f"[1:v]setpts=PTS-STARTPTS+{GIF_START}/TB[gif];"
-        f"[{last_label}][gif]overlay="
+    # --- Scaling of Assets ---
+    # Input [1] is Subscribe.gif, Input [2] is Branding.png
+    scale_vf = (
+        f"[1:v]scale=350:-1[gif_scaled];"
+        f"[2:v]scale=350:-1[brand_scaled]"
+    )
+
+    # --- Permanent Branding Overlay (Bottom Center, 80px from bottom edge) ---
+    brand_vf = (
+        f"[{last_label}][brand_scaled]overlay="
         f"x=(W-w)/2:"
-        f"y=H-h-160:"
+        f"y=H-h-80:"
+        f"eof_action=pass[branded]"
+    )
+
+    # --- Temporary Subscribe GIF Overlay (Centered above the branding logo) ---
+    gif_vf = (
+        f"[gif_scaled]setpts=PTS-STARTPTS+{GIF_START}/TB[gif_timed];"
+        f"[branded][gif_timed]overlay="
+        f"x=(W-w)/2:"
+        f"y=H-h-260:"
         f"enable='between(t,{GIF_START},{GIF_END})':"
-        f"eof_action=pass"
-        f"[vout]"
+        f"eof_action=pass[vout]"
     )
 
     # Assemble full filter_complex
     filter_parts = [base_vf]
     if title_vf:
         filter_parts.append(title_vf)
+    filter_parts.append(scale_vf)
+    filter_parts.append(brand_vf)
     filter_parts.append(gif_vf)
     filter_complex = ";".join(filter_parts)
 
@@ -246,8 +280,9 @@ def cut_and_reframe(video_path: Path, start: float, clip_seconds: int, out_path:
     run([
         "ffmpeg", "-y",
         "-i", str(video_path),
-        "-ignore_loop", "0",   # Let FFmpeg read all GIF frames (we control timing via enable/setpts)
+        "-ignore_loop", "0",   # Let FFmpeg read all GIF frames
         "-i", str(GIF_PATH),
+        "-i", str(BRANDING_PATH), # Permanent branding asset
         "-filter_complex", filter_complex,
         "-map", "[vout]", "-map", "[aout]",
         "-c:v", "libx264", "-c:a", "aac", "-shortest", str(out_path),
@@ -290,7 +325,7 @@ def burn_captions(clip_video_path: Path, srt_path: Path, out_path: Path):
         "BorderStyle=1,"
         "Outline=1.2,"                  # Adjusted border thickness to match the smaller font size
         "Alignment=2,"                  # Bottom-center alignment
-        "MarginV=90"                    # Moved down slightly from 100
+        "MarginV=80"                    # Moved 10 more down (originally 90, now 80)
     )
     run([
         "ffmpeg", "-y", "-i", str(clip_video_path),
@@ -427,6 +462,10 @@ def main():
     print(f"Best window starts at {start:.0f}s")
 
     clip_path = WORK_DIR / f"{video_id}_clip.mp4"
+    
+    # Ensure premium multilingual Poppins font is downloaded before frame reframing
+    download_font(TITLE_FONT_FILE)
+    
     cut_and_reframe(raw_path, start, CLIP_SECONDS, clip_path, title=title)
 
     srt_path = WORK_DIR / f"{video_id}.srt"
