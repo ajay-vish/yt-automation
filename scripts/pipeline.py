@@ -141,6 +141,38 @@ def find_best_window(wav_path: Path, clip_seconds: int) -> float:
     return float(best_start)
 
 
+def _find_devanagari_font() -> str:
+    """Ask fontconfig for the best available Devanagari font file.
+    Falls back to a known path if fc-match is unavailable."""
+    try:
+        result = subprocess.run(
+            ["fc-match", "Noto Sans Devanagari:lang=hi", "--format=%{file}"],
+            capture_output=True, text=True, check=True,
+        )
+        font_path = result.stdout.strip()
+        if font_path:
+            print(f"[font] Using Devanagari font: {font_path}")
+            return font_path
+    except Exception as e:
+        print(f"[font] fc-match failed ({e}), trying fallback paths.")
+
+    # Fallback: try known Ubuntu paths in order
+    fallbacks = [
+        "/usr/share/fonts/truetype/noto/NotoSansDevanagari-Regular.ttf",
+        "/usr/share/fonts/opentype/noto/NotoSansDevanagari-Regular.otf",
+        "/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf",
+    ]
+    for path in fallbacks:
+        if Path(path).exists():
+            print(f"[font] Using fallback font: {path}")
+            return path
+
+    raise RuntimeError(
+        "No Devanagari font found. Install fonts-noto: sudo apt-get install fonts-noto"
+    )
+
+
+
 def _wrap_title(text: str) -> list[str]:
     """Break a long title into up to TITLE_MAX_LINES lines that fit within
     the frame width at TITLE_FONT_SIZE. If it still doesn't fit in
@@ -190,6 +222,7 @@ def cut_and_reframe(video_path: Path, start: float, clip_seconds: int, out_path:
     # --- Title text overlay at the top, wrapped so it never overflows ---
     title_vf_parts = []
     if display_title:
+        font_path = _find_devanagari_font()
         lines = _wrap_title(display_title)
         line_height = TITLE_FONT_SIZE + TITLE_LINE_SPACING
         prev_label = "base"
@@ -199,7 +232,7 @@ def cut_and_reframe(video_path: Path, start: float, clip_seconds: int, out_path:
             title_vf_parts.append(
                 f"[{prev_label}]drawtext="
                 f"text='{_escape_drawtext(line)}':"
-                f"fontfile=/usr/share/fonts/truetype/noto/NotoSansDevanagari-Regular.ttf:"
+                f"fontfile={font_path}:"
                 f"fontsize={TITLE_FONT_SIZE}:"
                 f"fontcolor={TITLE_COLOR}:"
                 f"borderw={TITLE_OUTLINE_WIDTH}:"
