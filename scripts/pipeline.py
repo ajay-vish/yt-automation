@@ -199,7 +199,7 @@ def cut_and_reframe(video_path: Path, start: float, clip_seconds: int, out_path:
             title_vf_parts.append(
                 f"[{prev_label}]drawtext="
                 f"text='{_escape_drawtext(line)}':"
-                f"fontfile=/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf:"
+                f"fontfile=/usr/share/fonts/truetype/noto/NotoSansDevanagari-Regular.ttf:"
                 f"fontsize={TITLE_FONT_SIZE}:"
                 f"fontcolor={TITLE_COLOR}:"
                 f"borderw={TITLE_OUTLINE_WIDTH}:"
@@ -276,7 +276,7 @@ def transcribe_to_srt(clip_video_path: Path, srt_path: Path) -> str:
 def burn_captions(clip_video_path: Path, srt_path: Path, out_path: Path):
     # Force a readable style: white text, black outline, bottom-centered.
     # Use Noto Sans Devanagari for proper Hindi/Bhojpuri script rendering.
-    style = "FontName=Noto Sans Devanagari,FontSize=11,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BorderStyle=1,Outline=1.5,Alignment=2,MarginV=50"
+    style = "FontName=Noto Sans Devanagari,FontSize=11,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BorderStyle=1,Outline=1.5,Alignment=2,MarginV=160"
     run([
         "ffmpeg", "-y", "-i", str(clip_video_path),
         "-vf", f"subtitles={srt_path}:force_style='{style}'",
@@ -289,10 +289,19 @@ def generate_metadata(source_id: str, source_title: str, transcript: str) -> tup
     and tags. Returns (title, description, tags). Falls back to a plain title
     if the API call fails so the pipeline never crashes at this step."""
     import json as _json
+    import traceback
     from google import genai
     from google.genai import types
 
-    client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
+    # --- 1. Confirm the API key is present ---
+    api_key = os.environ.get("GEMINI_API_KEY", "")
+    if not api_key:
+        print("ERROR: GEMINI_API_KEY env var is not set. Skipping metadata generation.")
+        fallback_title = source_title.split("|")[0].strip()[:100]
+        return fallback_title, "", []
+    print(f"[Gemini] API key present (length={len(api_key)}, prefix={api_key[:6]}...)")
+
+    client = genai.Client(api_key=api_key)
 
     prompt = (
         f'You are a YouTube channel manager for a Bhojpuri folk songs (lokgeet) channel.\n\n'
@@ -313,7 +322,12 @@ def generate_metadata(source_id: str, source_title: str, transcript: str) -> tup
         f'Return only valid JSON — no markdown fences, no explanation.'
     )
 
+    # --- 2. Log the prompt being sent ---
+    print(f"[Gemini] Sending prompt ({len(prompt)} chars):\n{prompt[:300]}{'...' if len(prompt) > 300 else ''}")
+
     try:
+        # --- 3. Call the API ---
+        print("[Gemini] Calling gemini-2.0-flash ...")
         response = client.models.generate_content(
             model="gemini-2.0-flash",
             contents=prompt,
@@ -321,15 +335,28 @@ def generate_metadata(source_id: str, source_title: str, transcript: str) -> tup
                 response_mime_type="application/json",
             ),
         )
+
+        # --- 4. Log the raw response ---
+        print(f"[Gemini] Raw response:\n{response.text}")
+
+        # --- 5. Parse and log each field ---
         data = _json.loads(response.text)
-        ai_title = str(data.get("title", source_title))[:100]
+        ai_title       = str(data.get("title", source_title))[:100]
         ai_description = str(data.get("description", ""))
-        ai_tags = [str(t) for t in data.get("tags", [])][:20]
-        print(f"Gemini title: {ai_title}")
+        ai_tags        = [str(t) for t in data.get("tags", [])][:20]
+
+        print(f"[Gemini] title       : {ai_title}")
+        print(f"[Gemini] description : {ai_description[:120]}{'...' if len(ai_description) > 120 else ''}")
+        print(f"[Gemini] tags ({len(ai_tags)})   : {ai_tags}")
+
         return ai_title, ai_description, ai_tags
-    except Exception as exc:  # never let metadata generation crash the whole pipeline
-        print(f"WARNING: Gemini metadata generation failed ({exc}). Using fallback title.")
+
+    except Exception as exc:
+        print(f"[Gemini] ERROR: {exc}")
+        print("[Gemini] Full traceback:")
+        traceback.print_exc()
         fallback_title = source_title.split("|")[0].strip()[:100]
+        print(f"[Gemini] Falling back to title: {fallback_title}")
         return fallback_title, "", []
 
 
