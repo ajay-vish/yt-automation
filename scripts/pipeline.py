@@ -87,7 +87,8 @@ def download_video(video_id, dest: Path) -> Path:
     dest.mkdir(parents=True, exist_ok=True)
     out_template = str(dest / f"{video_id}.%(ext)s")
     run([
-        "yt-dlp", "-f", "bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/best[height<=1080]",
+        "yt-dlp", *cookie_args(),
+        "-f", "bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/best[height<=1080]",
         "--merge-output-format", "mp4",
         "-o", out_template,
         f"https://www.youtube.com/watch?v={video_id}",
