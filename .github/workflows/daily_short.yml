@@ -6,6 +6,9 @@ on:
     - cron: "0 3 * * *"
   workflow_dispatch: {}   # lets you trigger it manually from the Actions tab too
 
+permissions:
+  contents: write
+
 jobs:
   make-short:
     runs-on: ubuntu-latest
@@ -25,8 +28,8 @@ jobs:
           path: ~/.cache/huggingface
           key: ${{ runner.os }}-hf-whisper-small
 
-      - name: Install ffmpeg
-        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - name: Install ffmpeg and Hindi fonts
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg fonts-noto fonts-noto-cjk
 
       - name: Install Python deps
         run: pip install -r scripts/requirements.txt
@@ -55,9 +58,12 @@ jobs:
         run: rm -f cookies.txt
 
       - name: Commit updated state + draft prompt
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           git config user.name "shorts-bot"
           git config user.email "shorts-bot@users.noreply.github.com"
+          git remote set-url origin https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}
           git add state.json drafts/
           git commit -m "Daily short: update state + draft prompt" || echo "Nothing to commit"
           git push

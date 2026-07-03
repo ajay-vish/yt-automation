@@ -171,7 +171,8 @@ def transcribe_to_srt(clip_video_path: Path, srt_path: Path) -> str:
 
 def burn_captions(clip_video_path: Path, srt_path: Path, out_path: Path):
     # Force a readable style: white text, black outline, bottom-centered.
-    style = "FontName=Noto Sans,FontSize=16,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BorderStyle=1,Outline=2,Alignment=2,MarginV=80"
+    # Use Noto Sans Devanagari for proper Hindi/Bhojpuri script rendering.
+    style = "FontName=Noto Sans Devanagari,FontSize=20,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BorderStyle=1,Outline=3,Alignment=2,MarginV=80"
     run([
         "ffmpeg", "-y", "-i", str(clip_video_path),
         "-vf", f"subtitles={srt_path}:force_style='{style}'",
