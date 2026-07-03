@@ -1,5 +1,5 @@
 """
-Bhojpuri Folk Song -> YouTube Shorts, fully automated (free tools only).
+Bhojpuri Folk Song -> YouTube Shorts, fully automated.
 
 What it does, every run:
   1. Lists all videos on the channel (yt-dlp, no API key needed).
@@ -7,18 +7,14 @@ What it does, every run:
   3. Downloads it, finds the loudest/most "sung" ~35s window (librosa) so the
      clip lands on the chorus instead of silence or talking.
   4. Cuts that window, reframes it to 9:16 with a blurred-background fill.
+     Overlays the song title at the top and a subscribe GIF at the bottom.
   5. Transcribes that window locally with faster-whisper and burns captions.
-  6. Uploads the result to YouTube as PRIVATE with a placeholder title.
-  7. Writes a ready-to-paste prompt (with the transcript) into
-     drafts/<video_id>_prompt.txt so you can generate title/description/tags
-     with Claude free tier whenever you have time, then flip the video public.
+  6. Calls Gemini 2.0 Flash (free via Google AI Studio) to generate a
+     production-ready title, description, and tags from the transcript.
+  7. Uploads the result to YouTube as PRIVATE with the AI-generated metadata.
+     Flip to Public in YouTube Studio once you've reviewed it.
   8. Marks the source video as used in state.json so it won't repeat until
      every video has been used once.
-
-Everything here is free: yt-dlp, ffmpeg, librosa and faster-whisper all run
-locally (or in GitHub Actions' free runner minutes). The only paid step is
-optional (an LLM API), and this script does NOT call one -- you do that
-manually via the generated prompt file.
 """
 
 import json
@@ -36,7 +32,6 @@ import numpy as np
 CHANNEL_URL = "https://www.youtube.com/@manjuvishwakarmalokgeet/videos"
 STATE_FILE = Path("state.json")
 WORK_DIR = Path("work")
-DRAFTS_DIR = Path("drafts")
 CLIP_SECONDS = 35
 SHORT_WIDTH, SHORT_HEIGHT = 1080, 1920
 
@@ -289,7 +284,57 @@ def burn_captions(clip_video_path: Path, srt_path: Path, out_path: Path):
     ])
 
 
-def upload_private(video_path: Path, placeholder_title: str, description: str) -> str:
+def generate_metadata(source_id: str, source_title: str, transcript: str) -> tuple[str, str, list[str]]:
+    """Call Gemini 2.0 Flash to produce a production-ready title, description,
+    and tags. Returns (title, description, tags). Falls back to a plain title
+    if the API call fails so the pipeline never crashes at this step."""
+    import json as _json
+    from google import genai
+    from google.genai import types
+
+    client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
+
+    prompt = (
+        f'You are a YouTube channel manager for a Bhojpuri folk songs (lokgeet) channel.\n\n'
+        f'Source song: "{source_title}"\n'
+        f'Full video: https://www.youtube.com/watch?v={source_id}\n\n'
+        f'Transcript of the 35-second Short clip (Hindi/Bhojpuri, may have errors):\n'
+        f'"{transcript.strip()}"\n\n'
+        f'Return a JSON object with exactly these three keys:\n'
+        f'  "title"       – YouTube Shorts title, under 100 characters.\n'
+        f'                   Format: Song Name \u2013 Singer | Bhojpuri Folk Song #Shorts\n'
+        f'                   Guess / fix song name and singer from context if needed.\n'
+        f'  "description" – 3-5 line YouTube description. Include the song name, one\n'
+        f'                   evocative line about the song, the full video link\n'
+        f'                   (https://www.youtube.com/watch?v={source_id}), and hashtags.\n'
+        f'  "tags"        – JSON array of 15-20 tag strings mixing broad terms\n'
+        f'                   (bhojpuri, folk song, lokgeet, indian folk music) and\n'
+        f'                   specific terms (song name, singer name, region).\n\n'
+        f'Return only valid JSON — no markdown fences, no explanation.'
+    )
+
+    try:
+        response = client.models.generate_content(
+            model="gemini-2.0-flash",
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                response_mime_type="application/json",
+            ),
+        )
+        data = _json.loads(response.text)
+        ai_title = str(data.get("title", source_title))[:100]
+        ai_description = str(data.get("description", ""))
+        ai_tags = [str(t) for t in data.get("tags", [])][:20]
+        print(f"Gemini title: {ai_title}")
+        return ai_title, ai_description, ai_tags
+    except Exception as exc:  # never let metadata generation crash the whole pipeline
+        print(f"WARNING: Gemini metadata generation failed ({exc}). Using fallback title.")
+        fallback_title = source_title.split("|")[0].strip()[:100]
+        return fallback_title, "", []
+
+
+def upload_private(video_path: Path, title: str, description: str, tags: list[str]) -> str:
+    """Upload the video as PRIVATE with the supplied metadata."""
     from google.oauth2.credentials import Credentials
     from googleapiclient.discovery import build
     from googleapiclient.http import MediaFileUpload
@@ -305,9 +350,9 @@ def upload_private(video_path: Path, placeholder_title: str, description: str) -
 
     body = {
         "snippet": {
-            "title": placeholder_title[:100],
-            "description": description[:5000],  # YouTube description limit
-            "tags": [],
+            "title": title[:100],
+            "description": description[:5000],  # YouTube description hard limit
+            "tags": tags,
             "categoryId": "10",  # Music
         },
         "status": {"privacyStatus": "private", "selfDeclaredMadeForKids": False},
@@ -318,23 +363,7 @@ def upload_private(video_path: Path, placeholder_title: str, description: str) -
     return response["id"]
 
 
-def build_claude_prompt(source_id: str, source_title: str, transcript: str) -> str:
-    """Build the Claude prompt that is stored in the uploaded video's description.
-    The user copies it into Claude to get a real title / description / tags,
-    then flips the video from Private to Public in YouTube Studio."""
-    return (
-        f'I run a YouTube channel of Bhojpuri folk songs (lokgeet). I\'ve made a Short from this song: "{source_title}" '
-        f"(full video: https://www.youtube.com/watch?v={source_id}).\n\n"
-        f"Here is a rough transcript of the clip used in the Short (Hindi/Bhojpuri, may contain transcription errors):\n"
-        f'"{transcript.strip()}"\n\n'
-        f"Please give me:\n\n"
-        f"A YouTube Shorts TITLE (under 100 characters) in the format: Song Name \u2013 Singer | Bhojpuri Folk Song #Shorts "
-        f"(fix/guess the singer and song name from context if needed)\n"
-        f"A YouTube DESCRIPTION (3-5 lines) that includes the song name, a short evocative line about the song, "
-        f"the actual full video link I provided above (not a placeholder), and relevant hashtags.\n"
-        f"15-20 YouTube TAGS (comma-separated) mixing broad terms (bhojpuri, folk song, lokgeet, indian folk music) "
-        f"and specific terms (song name, singer name, region)."
-    )
+
 
 
 def main():
@@ -360,11 +389,12 @@ def main():
     final_path = WORK_DIR / f"{video_id}_final.mp4"
     burn_captions(clip_path, srt_path, final_path)
 
-    placeholder_title = f"[DRAFT] {title[:80]}"
-    prompt_description = build_claude_prompt(video_id, title, transcript)
-    uploaded_id = upload_private(final_path, placeholder_title, prompt_description)
+    print("Generating metadata with Gemini...")
+    ai_title, ai_description, ai_tags = generate_metadata(video_id, title, transcript)
+
+    uploaded_id = upload_private(final_path, ai_title, ai_description, ai_tags)
     print(f"Uploaded as private: https://studio.youtube.com/video/{uploaded_id}/edit")
-    print("Claude prompt embedded in video description — open the video in Studio, copy the description into Claude, then flip to Public.")
+    print("Review in YouTube Studio, then flip to Public.")
 
     state["used_video_ids"].append(video_id)
     save_state(state)
