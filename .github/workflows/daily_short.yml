@@ -23,6 +23,14 @@ jobs:
       - name: Install Python deps
         run: pip install -r scripts/requirements.txt
 
+      - name: Install Deno (JS runtime needed by yt-dlp)
+        run: |
+          curl -fsSL https://deno.land/install.sh | sh
+          echo "$HOME/.deno/bin" >> $GITHUB_PATH
+
+      - name: Upgrade yt-dlp to latest
+        run: pip install -U yt-dlp
+
       - name: Write cookies file
         run: echo "${{ secrets.YT_COOKIES }}" > cookies.txt
 
