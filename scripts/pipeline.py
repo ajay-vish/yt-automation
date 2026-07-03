@@ -181,16 +181,14 @@ def cut_and_reframe(video_path: Path, start: float, clip_seconds: int, out_path:
     # --- Derive display title ---
     display_title = title.split("|")[0].strip() if title else ""
 
-    # --- Base: blur background + foreground composite + top & bottom design banners ---
+    # --- Base: blur background + foreground composite (leaving background colorful/hazy) ---
     base_vf = (
         f"[0:v]trim=start={start}:duration={clip_seconds},setpts=PTS-STARTPTS,"
         f"scale={SHORT_WIDTH}:{SHORT_HEIGHT}:force_original_aspect_ratio=increase,crop={SHORT_WIDTH}:{SHORT_HEIGHT},"
         f"boxblur=20:5[bg];"
         f"[0:v]trim=start={start}:duration={clip_seconds},setpts=PTS-STARTPTS,"
         f"scale={SHORT_WIDTH}:-2[fg];"
-        f"[bg][fg]overlay=(W-w)/2:(H-h)/2,"
-        f"drawbox=y=0:h=420:color=black@0.35:t=fill,"
-        f"drawbox=y=ih-420:h=420:color=black@0.35:t=fill[base]"  # FIXED: Changed H-420 to ih-420
+        f"[bg][fg]overlay=(W-w)/2:(H-h)/2[base]"
     )
 
     # --- Title text overlay at the top, wrapped so it never overflows ---
@@ -286,13 +284,13 @@ def burn_captions(clip_video_path: Path, srt_path: Path, out_path: Path):
     # Use Noto Sans Devanagari for proper Hindi/Bhojpuri script rendering.
     style = (
         "FontName=Noto Sans Devanagari,"
-        "FontSize=16,"                  # Increased size for mobile-first legibility
+        "FontSize=8,"                   # Reduced size by half for better visual proportion
         "PrimaryColour=&HFFFFFF&,"      # Crisp white
         "OutlineColour=&H000000&,"      # Solid black outline
         "BorderStyle=1,"
-        "Outline=2.0,"                  # Thick border to separate from background
+        "Outline=1.2,"                  # Adjusted border thickness to match the smaller font size
         "Alignment=2,"                  # Bottom-center alignment
-        "MarginV=100"                   # Fits beautifully inside the bottom banner
+        "MarginV=90"                    # Moved down slightly from 100
     )
     run([
         "ffmpeg", "-y", "-i", str(clip_video_path),
@@ -302,7 +300,7 @@ def burn_captions(clip_video_path: Path, srt_path: Path, out_path: Path):
 
 
 def generate_metadata(source_id: str, source_title: str, transcript: str) -> tuple[str, str, list[str]]:
-    """Call Gemini 2.0 Flash to produce a production-ready title, description,
+    """Call Gemini 2.5 Flash to produce a production-ready title, description,
     and tags. Returns (title, description, tags). Raises on any failure so the
     caller can decide the fallback strategy."""
     import json as _json
@@ -339,10 +337,10 @@ def generate_metadata(source_id: str, source_title: str, transcript: str) -> tup
 
     # --- 2. Log the prompt being sent ---
     print(f"[Gemini] Sending prompt ({len(prompt)} chars):\n{prompt[:300]}{'...' if len(prompt) > 300 else ''}")
-    print("[Gemini] Calling gemini-2.0-flash ...")
+    print("[Gemini] Calling gemini-2.5-flash ...")
 
     response = client.models.generate_content(
-        model="gemini-2.0-flash", # FIXED: Changed from gemini-2.5-flash to standard 2.0-flash
+        model="gemini-2.5-flash",
         contents=prompt,
         config=types.GenerateContentConfig(
             response_mime_type="application/json",
