@@ -129,7 +129,7 @@ def cut_and_reframe(video_path: Path, start: float, clip_seconds: int, out_path:
     """Trim to the window and convert to 9:16 with a blurred, filled background."""
     vf = (
         f"[0:v]trim=start={start}:duration={clip_seconds},setpts=PTS-STARTPTS,"
-        f"scale={SHORT_WIDTH}:-1,crop={SHORT_WIDTH}:{SHORT_HEIGHT}:0:(ih-{SHORT_HEIGHT})/2,"
+        f"scale={SHORT_WIDTH}:{SHORT_HEIGHT}:force_original_aspect_ratio=increase,crop={SHORT_WIDTH}:{SHORT_HEIGHT},"
         f"boxblur=20:5[bg];"
         f"[0:v]trim=start={start}:duration={clip_seconds},setpts=PTS-STARTPTS,"
         f"scale={SHORT_WIDTH}:-2[fg];"
