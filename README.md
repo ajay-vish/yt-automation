@@ -55,6 +55,20 @@ tab -> "Daily Bhojpuri Short" -> "Run workflow".
    that (private) video.
 4. Set the video to Public.
 
+## Updating YouTube Cookies
+
+Since YouTube periodically invalidates session cookies, you may need to update the cookies manually in GitHub Secrets when the pipeline encounters download or authentication issues.
+
+To update the cookies:
+1. Open [YouTube](https://www.youtube.com) in your browser and ensure you are logged in.
+2. Open the browser's Developer Tools console (Press `F12` or right-click and select **Inspect**, then go to the **Console** tab).
+3. Paste and run the following code to copy your cookies to the clipboard:
+   ```javascript
+   copy(document.cookie); console.log("Cookies copied to clipboard!");
+   ```
+4. Go to your GitHub repository -> **Settings** -> **Secrets and variables** -> **Actions**.
+5. Update (or create) the repository secret named **`YT_COOKIES`** by pasting the copied cookies as its value.
+
 ## Notes
 - The quota cost of one upload is 1,600 units/day against a 10,000/day
   free quota -- one short a day is nowhere close to the limit.
