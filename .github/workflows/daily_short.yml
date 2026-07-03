@@ -2,8 +2,9 @@ name: Daily Bhojpuri Short
 
 on:
   schedule:
+    # Runs at 03:00 UTC = 08:30 IST every day. Adjust as you like.
     - cron: "0 3 * * *"
-  workflow_dispatch: {}
+  workflow_dispatch: {}   # lets you trigger it manually from the Actions tab too
 
 jobs:
   make-short:
@@ -22,12 +23,20 @@ jobs:
       - name: Install Python deps
         run: pip install -r scripts/requirements.txt
 
+      - name: Write cookies file
+        run: echo "${{ secrets.YT_COOKIES }}" > cookies.txt
+
       - name: Run pipeline
+        working-directory: .
         env:
           YT_CLIENT_ID: ${{ secrets.YT_CLIENT_ID }}
           YT_CLIENT_SECRET: ${{ secrets.YT_CLIENT_SECRET }}
           YT_REFRESH_TOKEN: ${{ secrets.YT_REFRESH_TOKEN }}
         run: python scripts/pipeline.py
+
+      - name: Clean up cookies file
+        if: always()
+        run: rm -f cookies.txt
 
       - name: Commit updated state + draft prompt
         run: |
