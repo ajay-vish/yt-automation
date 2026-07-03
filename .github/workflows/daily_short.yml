@@ -2,8 +2,18 @@ name: Daily Bhojpuri Short
 
 on:
   schedule:
-    # Runs at 03:00 UTC = 08:30 IST every day. Adjust as you like.
-    - cron: "0 3 * * *"
+    # 1. MORNING BATCH: Runs at 23:00 UTC (Previous day) = 04:30 AM IST
+    # Gives the video time to index for the 6:00 AM - 8:00 AM morning crowd
+    - cron: "0 23 * * *"
+    
+    # 2. LUNCH BATCH: Runs at 05:00 UTC = 10:30 AM IST
+    # Gives the video time to index for the 12:00 PM - 2:00 PM afternoon scroll
+    - cron: "0 5 * * *"
+    
+    # 3. EVENING PRIME TIME: Runs at 11:00 UTC = 04:30 PM IST
+    # Gives the video time to index for the 6:00 PM - 9:00 PM prime time spike
+    - cron: "0 11 * * *"
+    
   workflow_dispatch: {}   # lets you trigger it manually from the Actions tab too
 
 permissions:
