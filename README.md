@@ -60,14 +60,23 @@ tab -> "Daily Bhojpuri Short" -> "Run workflow".
 Since YouTube periodically invalidates session cookies, you may need to update the cookies manually in GitHub Secrets when the pipeline encounters download or authentication issues.
 
 To update the cookies:
-1. Open [YouTube](https://www.youtube.com) in your browser and ensure you are logged in.
-2. Open the browser's Developer Tools console (Press `F12` or right-click and select **Inspect**, then go to the **Console** tab).
-3. Paste and run the following code to copy your cookies to the clipboard:
-   ```javascript
-   copy(document.cookie); console.log("Cookies copied to clipboard!");
-   ```
+
+### Method 1: Using a Browser Extension (Easiest & Recommended)
+1. Install a browser extension like **Get cookies.txt LOCALLY** (available on Chrome, Firefox, and Edge).
+2. Open [YouTube](https://www.youtube.com) and ensure you are logged in.
+3. Click the extension icon and copy/download the cookies.
 4. Go to your GitHub repository -> **Settings** -> **Secrets and variables** -> **Actions**.
-5. Update (or create) the repository secret named **`YT_COOKIES`** by pasting the copied cookies as its value.
+5. Update (or create) the repository secret named **`YT_COOKIES`** by pasting the copied Netscape formatted cookies as its value.
+
+### Method 2: Copying from the Network Tab (No Extensions)
+Because YouTube protects critical authentication cookies with the `HttpOnly` flag, running `document.cookie` in the Javascript console **will not capture them**. Instead, copy the full header from the Network tab:
+1. Open [YouTube](https://www.youtube.com) and ensure you are logged in.
+2. Open Developer Tools (`F12`), go to the **Network** tab, and refresh the page.
+3. Click on the first request (usually `www.youtube.com` or `watch?v=...`).
+4. In the headers panel on the right, scroll down to **Request Headers** and locate the **`Cookie`** header.
+5. Copy the entire value of the **`Cookie`** header (a long semicolon-separated string).
+6. Go to your GitHub repository -> **Settings** -> **Secrets and variables** -> **Actions**.
+7. Update (or create) the repository secret named **`YT_COOKIES`** by pasting the copied string. The pipeline script will automatically parse and convert this raw string to Netscape format during execution.
 
 ## Notes
 - The quota cost of one upload is 1,600 units/day against a 10,000/day

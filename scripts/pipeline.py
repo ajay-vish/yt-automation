@@ -43,7 +43,7 @@ TITLE_OUTLINE_WIDTH = 4                 # Crisp text border
 TITLE_SHADOW_COLOR  = "black@0.5"       # Soft drop shadow for depth
 TITLE_SHADOW_X      = 3                 # Shadow offset X
 TITLE_SHADOW_Y      = 3                 # Shadow offset Y
-TITLE_Y_START       = 205               # Moved 25 more down (originally 180)
+TITLE_Y_START       = 215               # Moved 10 more down (originally 205)
 TITLE_MAX_LINES     = 2                 # Hard cap to prevent overflow
 TITLE_SIDE_MARGIN   = 80                # Margin clear of edges
 TITLE_LINE_SPACING  = 16                # Spacing between lines
@@ -269,16 +269,20 @@ def cut_and_reframe(video_path: Path, start: float, clip_seconds: int, out_path:
 
     # --- Scaling of Assets ---
     # Input [1] is Subscribe.gif, Input [2] is Branding.png
+    # Branding logo: scaled to 455 (350 * 1.30 = 455), added yuva420p format,
+    # and applied geq filter to add 10% border-radius (H*0.1).
     scale_vf = (
         f"[1:v]scale=350:-1[gif_scaled];"
-        f"[2:v]scale=350:-1[brand_scaled]"
+        f"[2:v]scale=455:-1,format=yuva420p,"
+        f"geq=lum='p(X,Y)':cb='p(X,Y)':cr='p(X,Y)':a='if(gt(abs(W/2-X),W/2-(H*0.1))*gt(abs(H/2-Y),H/2-(H*0.1)),"
+        f"if(lte(hypot((H*0.1)-(W/2-abs(W/2-X)),(H*0.1)-(H/2-abs(H/2-Y))),(H*0.1)),p(X,Y),0),p(X,Y))'[brand_scaled]"
     )
 
-    # --- Permanent Branding Overlay (Bottom Center, 80px from bottom edge) ---
+    # --- Permanent Branding Overlay (Bottom Center, 100px from bottom edge) ---
     brand_vf = (
         f"[{last_label}][brand_scaled]overlay="
         f"x=(W-w)/2:"
-        f"y=H-h-80:"
+        f"y=H-h-100:"
         f"eof_action=repeat[branded]"
     )
 
