@@ -74,21 +74,48 @@ def save_state(state):
 
 def cookie_args():
     """If a cookies.txt file is present (see README), pass it to yt-dlp so
-    YouTube doesn't block requests coming from GitHub's shared IPs."""
+    YouTube doesn't block requests coming from GitHub's shared IPs.
+    If the cookies are in raw document.cookie format, we automatically
+    convert them to Netscape format first."""
     cookies_path = os.environ.get("YT_COOKIES_FILE", "cookies.txt")
     if os.path.exists(cookies_path):
+        try:
+            content = Path(cookies_path).read_text(encoding="utf-8").strip()
+            # Convert raw document.cookie string to Netscape format if it's not already Netscape format
+            if content and not content.startswith("#") and "\t" not in content:
+                print("[cookies] Raw document.cookie format detected in cookies.txt. Converting to Netscape format...")
+                netscape_content = ["# Netscape HTTP Cookie File", "# Converted from raw document.cookie"]
+                for part in content.split(";"):
+                    part = part.strip()
+                    if not part or "=" not in part:
+                        continue
+                    name, val = part.split("=", 1)
+                    # Default domain is .youtube.com for YouTube downloads
+                    netscape_content.append(f".youtube.com\tTRUE\t/\tTRUE\t2147483647\t{name.strip()}\t{val.strip()}")
+                Path(cookies_path).write_text("\n".join(netscape_content) + "\n", encoding="utf-8")
+                print("[cookies] Conversion complete.")
+        except Exception as e:
+            print(f"[cookies] Warning: Failed to inspect/convert cookies.txt: {e}")
         return ["--cookies", cookies_path]
     return []
 
 
 def list_channel_videos():
     """Return [{"id": ..., "title": ...}, ...] for every video on the channel."""
-    out = subprocess.run(
-        ["yt-dlp", *cookie_args(), "--remote-components", "ejs:github", "--flat-playlist", "-J", CHANNEL_URL],
-        check=True, capture_output=True, text=True,
-    )
-    data = json.loads(out.stdout)
-    return [{"id": e["id"], "title": e.get("title", e["id"])} for e in data["entries"]]
+    try:
+        out = subprocess.run(
+            ["yt-dlp", *cookie_args(), "--remote-components", "ejs:github", "--flat-playlist", "-J", CHANNEL_URL],
+            check=True, capture_output=True, text=True,
+        )
+        data = json.loads(out.stdout)
+        return [{"id": e["id"], "title": e.get("title", e["id"])} for e in data["entries"]]
+    except subprocess.CalledProcessError as e:
+        print(f"[Error] yt-dlp command failed with exit code {e.returncode}")
+        if e.stderr:
+            print(f"[stderr] {e.stderr.strip()}")
+        if e.stdout:
+            print(f"[stdout] {e.stdout.strip()}")
+        raise
 
 def pick_video(state):
     videos = list_channel_videos()
