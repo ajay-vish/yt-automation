@@ -252,7 +252,7 @@ def cut_and_reframe(video_path: Path, start: float, clip_seconds: int, out_path:
         f"[{last_label}][brand_scaled]overlay="
         f"x=(W-w)/2:"
         f"y=H-h-80:"
-        f"eof_action=pass[branded]"
+        f"eof_action=repeat[branded]"
     )
 
     # --- Temporary Subscribe GIF Overlay (Centered above the branding logo) ---
