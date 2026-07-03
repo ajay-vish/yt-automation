@@ -26,7 +26,7 @@ import os
 import random
 import subprocess
 import sys
-from datetime import date
+
 from pathlib import Path
 
 import librosa
@@ -45,7 +45,7 @@ GIF_PATH = _REPO_ROOT / "assets" / "Subscribe.gif"
 
 # Title overlay settings
 TITLE_FONT = "Noto Sans"          # Fallback to a common system font; change if needed
-TITLE_FONT_SIZE = 52
+TITLE_FONT_SIZE = 26
 TITLE_COLOR = "white"
 TITLE_OUTLINE_COLOR = "black"
 TITLE_OUTLINE_WIDTH = 3
@@ -253,7 +253,7 @@ def burn_captions(clip_video_path: Path, srt_path: Path, out_path: Path):
     ])
 
 
-def upload_private(video_path: Path, placeholder_title: str, source_id: str, source_title: str) -> str:
+def upload_private(video_path: Path, placeholder_title: str, description: str) -> str:
     from google.oauth2.credentials import Credentials
     from googleapiclient.discovery import build
     from googleapiclient.http import MediaFileUpload
@@ -270,8 +270,7 @@ def upload_private(video_path: Path, placeholder_title: str, source_id: str, sou
     body = {
         "snippet": {
             "title": placeholder_title[:100],
-            "description": f"DRAFT auto-clip. Source video: https://www.youtube.com/watch?v={source_id} ({source_title})\n"
-                            f"Fill in real title/description/tags with the Claude prompt in drafts/{source_id}_prompt.txt, then set this to Public.",
+            "description": description[:5000],  # YouTube description limit
             "tags": [],
             "categoryId": "10",  # Music
         },
@@ -283,21 +282,23 @@ def upload_private(video_path: Path, placeholder_title: str, source_id: str, sou
     return response["id"]
 
 
-def write_claude_prompt(source_id: str, source_title: str, transcript: str, uploaded_video_id: str):
-    dated_dir = DRAFTS_DIR / date.today().isoformat()  # e.g. drafts/2026-07-03/
-    dated_dir.mkdir(parents=True, exist_ok=True)
-    prompt = f"""I run a YouTube channel of Bhojpuri folk songs (lokgeet). I've made a Short from this song: "{source_title}" (full video: https://www.youtube.com/watch?v={source_id}).
-
-Here is a rough transcript of the clip used in the Short (Hindi/Bhojpuri, may contain transcription errors):
-"{transcript.strip()}"
-
-Please give me:
-
-A YouTube Shorts TITLE (under 100 characters) in the format: Song Name – Singer | Bhojpuri Folk Song #Shorts (fix/guess the singer and song name from context if needed)
-A YouTube DESCRIPTION (3-5 lines) that includes the song name, a short evocative line about the song, the actual full video link I provided above (not a placeholder), and relevant hashtags.
-15-20 YouTube TAGS (comma-separated) mixing broad terms (bhojpuri, folk song, lokgeet, indian folk music) and specific terms (song name, singer name, region).
-"""
-    (dated_dir / f"{source_id}_prompt.txt").write_text(prompt, encoding="utf-8")
+def build_claude_prompt(source_id: str, source_title: str, transcript: str) -> str:
+    """Build the Claude prompt that is stored in the uploaded video's description.
+    The user copies it into Claude to get a real title / description / tags,
+    then flips the video from Private to Public in YouTube Studio."""
+    return (
+        f'I run a YouTube channel of Bhojpuri folk songs (lokgeet). I\'ve made a Short from this song: "{source_title}" '
+        f"(full video: https://www.youtube.com/watch?v={source_id}).\n\n"
+        f"Here is a rough transcript of the clip used in the Short (Hindi/Bhojpuri, may contain transcription errors):\n"
+        f'"{transcript.strip()}"\n\n'
+        f"Please give me:\n\n"
+        f"A YouTube Shorts TITLE (under 100 characters) in the format: Song Name \u2013 Singer | Bhojpuri Folk Song #Shorts "
+        f"(fix/guess the singer and song name from context if needed)\n"
+        f"A YouTube DESCRIPTION (3-5 lines) that includes the song name, a short evocative line about the song, "
+        f"the actual full video link I provided above (not a placeholder), and relevant hashtags.\n"
+        f"15-20 YouTube TAGS (comma-separated) mixing broad terms (bhojpuri, folk song, lokgeet, indian folk music) "
+        f"and specific terms (song name, singer name, region)."
+    )
 
 
 def main():
@@ -324,10 +325,10 @@ def main():
     burn_captions(clip_path, srt_path, final_path)
 
     placeholder_title = f"[DRAFT] {title[:80]}"
-    uploaded_id = upload_private(final_path, placeholder_title, video_id, title)
+    prompt_description = build_claude_prompt(video_id, title, transcript)
+    uploaded_id = upload_private(final_path, placeholder_title, prompt_description)
     print(f"Uploaded as private: https://studio.youtube.com/video/{uploaded_id}/edit")
-
-    write_claude_prompt(video_id, title, transcript, uploaded_id)
+    print("Claude prompt embedded in video description — open the video in Studio, copy the description into Claude, then flip to Public.")
 
     state["used_video_ids"].append(video_id)
     save_state(state)

@@ -64,6 +64,6 @@ jobs:
           git config user.name "shorts-bot"
           git config user.email "shorts-bot@users.noreply.github.com"
           git remote set-url origin https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}
-          git add state.json drafts/
-          git commit -m "Daily short: update state + draft prompt" || echo "Nothing to commit"
+          git add state.json
+          git commit -m "Daily short: update state" || echo "Nothing to commit"
           git push
