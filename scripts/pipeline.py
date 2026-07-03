@@ -40,20 +40,18 @@ _REPO_ROOT = Path(__file__).resolve().parent.parent
 GIF_PATH = _REPO_ROOT / "assets" / "Subscribe.gif"
 
 # Title overlay settings
-TITLE_FONT = "Noto Sans"          # Fallback to a common system font; change if needed
-TITLE_FONT_SIZE    = 58                # bigger for impact
-TITLE_COLOR        = "0xFFD700"        # gold / Bollywood yellow
-TITLE_OUTLINE_COLOR = "0x1A0000"       # deep dark red-black outline
-TITLE_OUTLINE_WIDTH = 5               # thick outline for crispness
-TITLE_SHADOW_COLOR  = "0xFF6600@0.85" # warm orange shadow
-TITLE_SHADOW_X      = 4               # shadow offset x
-TITLE_SHADOW_Y      = 4               # shadow offset y
-TITLE_BOX_COLOR     = "0x000000@0.45" # semi-transparent dark pill behind text
-TITLE_BOX_PADDING   = 18             # px padding inside the box
-TITLE_Y_START = "h*0.18"              # a bit lower than before
-TITLE_MAX_LINES = 2               # hard cap so a long title can't overflow the frame
-TITLE_SIDE_MARGIN = 80            # px kept clear on each side when wrapping
-TITLE_LINE_SPACING = 18           # extra px between wrapped lines
+TITLE_FONT          = "Noto Sans Devanagari" # Use font family name for automatic Latin character fallback
+TITLE_FONT_SIZE     = 56                # Clean, premium size
+TITLE_COLOR         = "gold"            # Vibrant gold/yellow
+TITLE_OUTLINE_COLOR = "black"           # High contrast black outline
+TITLE_OUTLINE_WIDTH = 4                 # Crisp text border
+TITLE_SHADOW_COLOR  = "black@0.5"       # Soft drop shadow for depth
+TITLE_SHADOW_X      = 3                 # Shadow offset X
+TITLE_SHADOW_Y      = 3                 # Shadow offset Y
+TITLE_Y_START       = 180               # Centered vertically in the top banner
+TITLE_MAX_LINES     = 2                 # Hard cap to prevent overflow
+TITLE_SIDE_MARGIN   = 80                # Margin clear of edges
+TITLE_LINE_SPACING  = 16                # Spacing between lines
 
 # Subscribe GIF timing (seconds into the clip)
 GIF_START = 5
@@ -146,35 +144,7 @@ def find_best_window(wav_path: Path, clip_seconds: int) -> float:
     return float(best_start)
 
 
-def _find_devanagari_font() -> str:
-    """Ask fontconfig for the best available Devanagari font file.
-    Falls back to a known path if fc-match is unavailable."""
-    try:
-        result = subprocess.run(
-            ["fc-match", "Noto Sans Devanagari:lang=hi", "--format=%{file}"],
-            capture_output=True, text=True, check=True,
-        )
-        font_path = result.stdout.strip()
-        if font_path:
-            print(f"[font] Using Devanagari font: {font_path}")
-            return font_path
-    except Exception as e:
-        print(f"[font] fc-match failed ({e}), trying fallback paths.")
 
-    # Fallback: try known Ubuntu paths in order
-    fallbacks = [
-        "/usr/share/fonts/truetype/noto/NotoSansDevanagari-Regular.ttf",
-        "/usr/share/fonts/opentype/noto/NotoSansDevanagari-Regular.otf",
-        "/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf",
-    ]
-    for path in fallbacks:
-        if Path(path).exists():
-            print(f"[font] Using fallback font: {path}")
-            return path
-
-    raise RuntimeError(
-        "No Devanagari font found. Install fonts-noto: sudo apt-get install fonts-noto"
-    )
 
 
 
@@ -208,43 +178,44 @@ def cut_and_reframe(video_path: Path, start: float, clip_seconds: int, out_path:
     """Trim to the window and convert to 9:16 with a blurred, filled background.
 
     Overlays:
-    - Title text at the top (first segment of title split on '|').
-    - Subscribe GIF from GIF_START to GIF_END seconds, centered at the bottom.
+    - Symmetrical top and bottom semi-transparent dark banners for master layout.
+    - Title text centered within the top banner.
+    - Subscribe GIF centered within the bottom banner.
     """
     # --- Derive display title ---
     display_title = title.split("|")[0].strip() if title else ""
 
-    # --- Base: blur background + foreground composite ---
+    # --- Base: blur background + foreground composite + top & bottom design banners ---
     base_vf = (
         f"[0:v]trim=start={start}:duration={clip_seconds},setpts=PTS-STARTPTS,"
         f"scale={SHORT_WIDTH}:{SHORT_HEIGHT}:force_original_aspect_ratio=increase,crop={SHORT_WIDTH}:{SHORT_HEIGHT},"
         f"boxblur=20:5[bg];"
         f"[0:v]trim=start={start}:duration={clip_seconds},setpts=PTS-STARTPTS,"
         f"scale={SHORT_WIDTH}:-2[fg];"
-        f"[bg][fg]overlay=(W-w)/2:(H-h)/2[base]"
+        f"[bg][fg]overlay=(W-w)/2:(H-h)/2,"
+        f"drawbox=y=0:h=420:color=black@0.35:t=fill,"
+        f"drawbox=y=H-420:h=420:color=black@0.35:t=fill[base]"
     )
 
     # --- Title text overlay at the top, wrapped so it never overflows ---
     title_vf_parts = []
     if display_title:
-        font_path = _find_devanagari_font()
         lines = _wrap_title(display_title)
         line_height = TITLE_FONT_SIZE + TITLE_LINE_SPACING
         prev_label = "base"
         for i, line in enumerate(lines):
             out_label = f"title{i}"
-            y_expr = f"{TITLE_Y_START}+{i * line_height}" if i else TITLE_Y_START
+            y_expr = f"{TITLE_Y_START}+{i * line_height}" if i else str(TITLE_Y_START)
             title_vf_parts.append(
                 f"[{prev_label}]drawtext="
                 f"text='{_escape_drawtext(line)}':"
-                f"fontfile={font_path}:"
+                f"font='{TITLE_FONT}':"
                 f"fontsize={TITLE_FONT_SIZE}:"
                 f"fontcolor={TITLE_COLOR}:"
                 f"borderw={TITLE_OUTLINE_WIDTH}:"
                 f"bordercolor={TITLE_OUTLINE_COLOR}:"
                 f"shadowx={TITLE_SHADOW_X}:shadowy={TITLE_SHADOW_Y}:"
                 f"shadowcolor={TITLE_SHADOW_COLOR}:"
-                f"box=1:boxcolor={TITLE_BOX_COLOR}:boxborderw={TITLE_BOX_PADDING}:"
                 f"x=(w-text_w)/2:"
                 f"y={y_expr}"
                 f"[{out_label}]"
@@ -315,9 +286,18 @@ def transcribe_to_srt(clip_video_path: Path, srt_path: Path) -> str:
 
 
 def burn_captions(clip_video_path: Path, srt_path: Path, out_path: Path):
-    # Force a readable style: white text, black outline, bottom-centered.
+    # Force a highly readable, premium style: white text, clean black outline, bottom-centered.
     # Use Noto Sans Devanagari for proper Hindi/Bhojpuri script rendering.
-    style = "FontName=Noto Sans Devanagari,FontSize=11,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BorderStyle=1,Outline=1.5,Alignment=2,MarginV=80"
+    style = (
+        "FontName=Noto Sans Devanagari,"
+        "FontSize=16,"                  # Increased size for mobile-first legibility
+        "PrimaryColour=&HFFFFFF&,"      # Crisp white
+        "OutlineColour=&H000000&,"      # Solid black outline
+        "BorderStyle=1,"
+        "Outline=2.0,"                  # Thick border to separate from background
+        "Alignment=2,"                  # Bottom-center alignment
+        "MarginV=100"                   # Fits beautifully inside the bottom banner
+    )
     run([
         "ffmpeg", "-y", "-i", str(clip_video_path),
         "-vf", f"subtitles={srt_path}:force_style='{style}'",
