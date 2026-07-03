@@ -26,6 +26,7 @@ import os
 import random
 import subprocess
 import sys
+import textwrap
 
 from pathlib import Path
 
@@ -49,6 +50,10 @@ TITLE_FONT_SIZE = 52
 TITLE_COLOR = "white"
 TITLE_OUTLINE_COLOR = "black"
 TITLE_OUTLINE_WIDTH = 3
+TITLE_Y_START = "h*0.12"          # top of the title block (proportional, avoids the top edge)
+TITLE_MAX_LINES = 2               # hard cap so a long title can't overflow the frame
+TITLE_SIDE_MARGIN = 80            # px kept clear on each side (40px * 2) when wrapping
+TITLE_LINE_SPACING = 14           # extra px between wrapped lines, on top of font height
 
 # Subscribe GIF timing (seconds into the clip)
 GIF_START = 5
@@ -141,6 +146,32 @@ def find_best_window(wav_path: Path, clip_seconds: int) -> float:
     return float(best_start)
 
 
+def _wrap_title(text: str) -> list[str]:
+    """Break a long title into up to TITLE_MAX_LINES lines that fit within
+    the frame width at TITLE_FONT_SIZE. If it still doesn't fit in
+    TITLE_MAX_LINES, the last line is truncated with an ellipsis so it
+    never overflows the video."""
+    # Rough average glyph width for Noto Sans -- good enough to size-wrap by.
+    avg_char_width = TITLE_FONT_SIZE * 0.56
+    max_chars_per_line = max(1, int((SHORT_WIDTH - TITLE_SIDE_MARGIN) / avg_char_width))
+
+    lines = textwrap.wrap(text, width=max_chars_per_line) or [text]
+
+    if len(lines) > TITLE_MAX_LINES:
+        lines = lines[:TITLE_MAX_LINES]
+        last = lines[-1]
+        if len(last) > 3:
+            last = last[: max_chars_per_line - 1].rstrip() + "\u2026"
+        lines[-1] = last
+
+    return lines
+
+
+def _escape_drawtext(text: str) -> str:
+    """Escape characters that break FFmpeg drawtext's text='...' syntax."""
+    return text.replace("\\", "\\\\").replace("'", "\\'").replace(":", "\\:")
+
+
 def cut_and_reframe(video_path: Path, start: float, clip_seconds: int, out_path: Path, title: str = ""):
     """Trim to the window and convert to 9:16 with a blurred, filled background.
 
@@ -150,8 +181,6 @@ def cut_and_reframe(video_path: Path, start: float, clip_seconds: int, out_path:
     """
     # --- Derive display title ---
     display_title = title.split("|")[0].strip() if title else ""
-    # Escape characters that break FFmpeg drawtext syntax
-    display_title = display_title.replace("'", "\\'").replace(":", "\\:")
 
     # --- Base: blur background + foreground composite ---
     base_vf = (
@@ -163,25 +192,32 @@ def cut_and_reframe(video_path: Path, start: float, clip_seconds: int, out_path:
         f"[bg][fg]overlay=(W-w)/2:(H-h)/2[base]"
     )
 
-    # --- Title text overlay at the top ---
-    title_vf = ""
+    # --- Title text overlay at the top, wrapped so it never overflows ---
+    title_vf_parts = []
     if display_title:
-        title_vf = (
-            f"[base]drawtext="
-            f"text='{display_title}':"
-            f"fontfile=/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf:"
-            f"fontsize={TITLE_FONT_SIZE}:"
-            f"fontcolor={TITLE_COLOR}:"
-            f"borderw={TITLE_OUTLINE_WIDTH}:"
-            f"bordercolor={TITLE_OUTLINE_COLOR}:"
-            f"x=(w-text_w)/2:"
-            f"y=h*0.12:"
-            f"line_spacing=10"
-            f"[titled]"
-        )
-        last_label = "titled"
+        lines = _wrap_title(display_title)
+        line_height = TITLE_FONT_SIZE + TITLE_LINE_SPACING
+        prev_label = "base"
+        for i, line in enumerate(lines):
+            out_label = f"title{i}"
+            y_expr = f"{TITLE_Y_START}+{i * line_height}" if i else TITLE_Y_START
+            title_vf_parts.append(
+                f"[{prev_label}]drawtext="
+                f"text='{_escape_drawtext(line)}':"
+                f"fontfile=/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf:"
+                f"fontsize={TITLE_FONT_SIZE}:"
+                f"fontcolor={TITLE_COLOR}:"
+                f"borderw={TITLE_OUTLINE_WIDTH}:"
+                f"bordercolor={TITLE_OUTLINE_COLOR}:"
+                f"x=(w-text_w)/2:"
+                f"y={y_expr}"
+                f"[{out_label}]"
+            )
+            prev_label = out_label
+        last_label = prev_label
     else:
         last_label = "base"
+    title_vf = ";".join(title_vf_parts)
 
     # --- Subscribe GIF overlay at the bottom (GIF_START to GIF_END seconds) ---
     # The GIF is passed as input[1]; we delay it by GIF_START seconds via setpts,
@@ -245,7 +281,7 @@ def transcribe_to_srt(clip_video_path: Path, srt_path: Path) -> str:
 def burn_captions(clip_video_path: Path, srt_path: Path, out_path: Path):
     # Force a readable style: white text, black outline, bottom-centered.
     # Use Noto Sans Devanagari for proper Hindi/Bhojpuri script rendering.
-    style = "FontName=Noto Sans Devanagari,FontSize=16,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BorderStyle=1,Outline=2,Alignment=2,MarginV=80"
+    style = "FontName=Noto Sans Devanagari,FontSize=11,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BorderStyle=1,Outline=1.5,Alignment=2,MarginV=50"
     run([
         "ffmpeg", "-y", "-i", str(clip_video_path),
         "-vf", f"subtitles={srt_path}:force_style='{style}'",
