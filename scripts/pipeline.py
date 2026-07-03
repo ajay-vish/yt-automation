@@ -9,7 +9,7 @@ What it does, every run:
   4. Cuts that window, reframes it to 9:16 with a blurred-background fill.
      Overlays the song title at the top and a subscribe GIF at the bottom.
   5. Transcribes that window locally with faster-whisper and burns captions.
-  6. Calls Gemini 2.5 Flash (free via Google AI Studio) to generate a
+  6. Calls Gemini 2.0 Flash (free via Google AI Studio) to generate a
      production-ready title, description, and tags from the transcript.
   7. Uploads the result to YouTube as PRIVATE with the AI-generated metadata.
      Flip to Public in YouTube Studio once you've reviewed it.
@@ -190,7 +190,7 @@ def cut_and_reframe(video_path: Path, start: float, clip_seconds: int, out_path:
         f"scale={SHORT_WIDTH}:-2[fg];"
         f"[bg][fg]overlay=(W-w)/2:(H-h)/2,"
         f"drawbox=y=0:h=420:color=black@0.35:t=fill,"
-        f"drawbox=y=ih-420:h=420:color=black@0.35:t=fill[base]"
+        f"drawbox=y=ih-420:h=420:color=black@0.35:t=fill[base]"  # FIXED: Changed H-420 to ih-420
     )
 
     # --- Title text overlay at the top, wrapped so it never overflows ---
@@ -302,10 +302,11 @@ def burn_captions(clip_video_path: Path, srt_path: Path, out_path: Path):
 
 
 def generate_metadata(source_id: str, source_title: str, transcript: str) -> tuple[str, str, list[str]]:
-    """Call Gemini 2.5 Flash to produce a production-ready title, description,
+    """Call Gemini 2.0 Flash to produce a production-ready title, description,
     and tags. Returns (title, description, tags). Raises on any failure so the
     caller can decide the fallback strategy."""
     import json as _json
+    import traceback
     from google import genai
     from google.genai import types
 
@@ -338,10 +339,10 @@ def generate_metadata(source_id: str, source_title: str, transcript: str) -> tup
 
     # --- 2. Log the prompt being sent ---
     print(f"[Gemini] Sending prompt ({len(prompt)} chars):\n{prompt[:300]}{'...' if len(prompt) > 300 else ''}")
-    print("[Gemini] Calling gemini-2.5-flash ...")
+    print("[Gemini] Calling gemini-2.0-flash ...")
 
     response = client.models.generate_content(
-        model="gemini-2.5-flash",
+        model="gemini-2.0-flash", # FIXED: Changed from gemini-2.5-flash to standard 2.0-flash
         contents=prompt,
         config=types.GenerateContentConfig(
             response_mime_type="application/json",
