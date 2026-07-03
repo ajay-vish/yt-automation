@@ -53,16 +53,23 @@ def load_state():
 def save_state(state):
     STATE_FILE.write_text(json.dumps(state, indent=2))
 
+def cookie_args():
+    """If a cookies.txt file is present (see README), pass it to yt-dlp so
+    YouTube doesn't block requests coming from GitHub's shared IPs."""
+    cookies_path = os.environ.get("YT_COOKIES_FILE", "cookies.txt")
+    if os.path.exists(cookies_path):
+        return ["--cookies", cookies_path]
+    return []
+
 
 def list_channel_videos():
     """Return [{"id": ..., "title": ...}, ...] for every video on the channel."""
     out = subprocess.run(
-        ["yt-dlp", "--flat-playlist", "-J", CHANNEL_URL],
+        ["yt-dlp", *cookie_args(), "--flat-playlist", "-J", CHANNEL_URL],
         check=True, capture_output=True, text=True,
     )
     data = json.loads(out.stdout)
     return [{"id": e["id"], "title": e.get("title", e["id"])} for e in data["entries"]]
-
 
 def pick_video(state):
     videos = list_channel_videos()
