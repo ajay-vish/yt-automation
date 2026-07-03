@@ -1,0 +1,7 @@
+yt-dlp
+librosa
+numpy
+faster-whisper
+google-auth
+google-auth-oauthlib
+google-api-python-client
