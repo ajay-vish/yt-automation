@@ -276,7 +276,7 @@ def transcribe_to_srt(clip_video_path: Path, srt_path: Path) -> str:
 def burn_captions(clip_video_path: Path, srt_path: Path, out_path: Path):
     # Force a readable style: white text, black outline, bottom-centered.
     # Use Noto Sans Devanagari for proper Hindi/Bhojpuri script rendering.
-    style = "FontName=Noto Sans Devanagari,FontSize=11,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BorderStyle=1,Outline=1.5,Alignment=2,MarginV=160"
+    style = "FontName=Noto Sans Devanagari,FontSize=11,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BorderStyle=1,Outline=1.5,Alignment=2,MarginV=80"
     run([
         "ffmpeg", "-y", "-i", str(clip_video_path),
         "-vf", f"subtitles={srt_path}:force_style='{style}'",
@@ -286,8 +286,8 @@ def burn_captions(clip_video_path: Path, srt_path: Path, out_path: Path):
 
 def generate_metadata(source_id: str, source_title: str, transcript: str) -> tuple[str, str, list[str]]:
     """Call Gemini 2.0 Flash to produce a production-ready title, description,
-    and tags. Returns (title, description, tags). Falls back to a plain title
-    if the API call fails so the pipeline never crashes at this step."""
+    and tags. Returns (title, description, tags). Raises on any failure so the
+    caller can decide the fallback strategy."""
     import json as _json
     import traceback
     from google import genai
@@ -296,9 +296,7 @@ def generate_metadata(source_id: str, source_title: str, transcript: str) -> tup
     # --- 1. Confirm the API key is present ---
     api_key = os.environ.get("GEMINI_API_KEY", "")
     if not api_key:
-        print("ERROR: GEMINI_API_KEY env var is not set. Skipping metadata generation.")
-        fallback_title = source_title.split("|")[0].strip()[:100]
-        return fallback_title, "", []
+        raise RuntimeError("GEMINI_API_KEY env var is not set.")
     print(f"[Gemini] API key present (length={len(api_key)}, prefix={api_key[:6]}...)")
 
     client = genai.Client(api_key=api_key)
@@ -310,54 +308,63 @@ def generate_metadata(source_id: str, source_title: str, transcript: str) -> tup
         f'Transcript of the 35-second Short clip (Hindi/Bhojpuri, may have errors):\n'
         f'"{transcript.strip()}"\n\n'
         f'Return a JSON object with exactly these three keys:\n'
-        f'  "title"       – YouTube Shorts title, under 100 characters.\n'
+        f'  "title"       \u2013 YouTube Shorts title, under 100 characters.\n'
         f'                   Format: Song Name \u2013 Singer | Bhojpuri Folk Song #Shorts\n'
         f'                   Guess / fix song name and singer from context if needed.\n'
-        f'  "description" – 3-5 line YouTube description. Include the song name, one\n'
+        f'  "description" \u2013 3-5 line YouTube description. Include the song name, one\n'
         f'                   evocative line about the song, the full video link\n'
         f'                   (https://www.youtube.com/watch?v={source_id}), and hashtags.\n'
-        f'  "tags"        – JSON array of 15-20 tag strings mixing broad terms\n'
+        f'  "tags"        \u2013 JSON array of 15-20 tag strings mixing broad terms\n'
         f'                   (bhojpuri, folk song, lokgeet, indian folk music) and\n'
         f'                   specific terms (song name, singer name, region).\n\n'
-        f'Return only valid JSON — no markdown fences, no explanation.'
+        f'Return only valid JSON \u2014 no markdown fences, no explanation.'
     )
 
     # --- 2. Log the prompt being sent ---
     print(f"[Gemini] Sending prompt ({len(prompt)} chars):\n{prompt[:300]}{'...' if len(prompt) > 300 else ''}")
+    print("[Gemini] Calling gemini-2.0-flash ...")
 
-    try:
-        # --- 3. Call the API ---
-        print("[Gemini] Calling gemini-2.0-flash ...")
-        response = client.models.generate_content(
-            model="gemini-2.0-flash",
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                response_mime_type="application/json",
-            ),
-        )
+    response = client.models.generate_content(
+        model="gemini-2.0-flash",
+        contents=prompt,
+        config=types.GenerateContentConfig(
+            response_mime_type="application/json",
+        ),
+    )
 
-        # --- 4. Log the raw response ---
-        print(f"[Gemini] Raw response:\n{response.text}")
+    # --- 3. Log the raw response ---
+    print(f"[Gemini] Raw response:\n{response.text}")
 
-        # --- 5. Parse and log each field ---
-        data = _json.loads(response.text)
-        ai_title       = str(data.get("title", source_title))[:100]
-        ai_description = str(data.get("description", ""))
-        ai_tags        = [str(t) for t in data.get("tags", [])][:20]
+    # --- 4. Parse and log each field ---
+    data = _json.loads(response.text)
+    ai_title       = str(data.get("title", source_title))[:100]
+    ai_description = str(data.get("description", ""))
+    ai_tags        = [str(t) for t in data.get("tags", [])][:20]
 
-        print(f"[Gemini] title       : {ai_title}")
-        print(f"[Gemini] description : {ai_description[:120]}{'...' if len(ai_description) > 120 else ''}")
-        print(f"[Gemini] tags ({len(ai_tags)})   : {ai_tags}")
+    print(f"[Gemini] title       : {ai_title}")
+    print(f"[Gemini] description : {ai_description[:120]}{'...' if len(ai_description) > 120 else ''}")
+    print(f"[Gemini] tags ({len(ai_tags)})   : {ai_tags}")
 
-        return ai_title, ai_description, ai_tags
+    return ai_title, ai_description, ai_tags
 
-    except Exception as exc:
-        print(f"[Gemini] ERROR: {exc}")
-        print("[Gemini] Full traceback:")
-        traceback.print_exc()
-        fallback_title = source_title.split("|")[0].strip()[:100]
-        print(f"[Gemini] Falling back to title: {fallback_title}")
-        return fallback_title, "", []
+
+def build_claude_prompt(source_id: str, source_title: str, transcript: str) -> str:
+    """Build the prompt stored in the uploaded video's description.
+    Open the video in YouTube Studio, copy the description into Claude / ChatGPT,
+    get title/description/tags, then flip the video to Public."""
+    return (
+        f'I run a YouTube channel of Bhojpuri folk songs (lokgeet). I\'ve made a Short from this song: "{source_title}" '
+        f"(full video: https://www.youtube.com/watch?v={source_id}).\n\n"
+        f"Here is a rough transcript of the clip used in the Short (Hindi/Bhojpuri, may contain transcription errors):\n"
+        f'"{transcript.strip()}"\n\n'
+        f"Please give me:\n\n"
+        f"A YouTube Shorts TITLE (under 100 characters) in the format: Song Name \u2013 Singer | Bhojpuri Folk Song #Shorts "
+        f"(fix/guess the singer and song name from context if needed)\n"
+        f"A YouTube DESCRIPTION (3-5 lines) that includes the song name, a short evocative line about the song, "
+        f"the actual full video link I provided above (not a placeholder), and relevant hashtags.\n"
+        f"15-20 YouTube TAGS (comma-separated) mixing broad terms (bhojpuri, folk song, lokgeet, indian folk music) "
+        f"and specific terms (song name, singer name, region)."
+    )
 
 
 def upload_private(video_path: Path, title: str, description: str, tags: list[str]) -> str:
@@ -390,9 +397,6 @@ def upload_private(video_path: Path, title: str, description: str, tags: list[st
     return response["id"]
 
 
-
-
-
 def main():
     state = load_state()
     video, _all_videos = pick_video(state)
@@ -416,12 +420,19 @@ def main():
     final_path = WORK_DIR / f"{video_id}_final.mp4"
     burn_captions(clip_path, srt_path, final_path)
 
-    print("Generating metadata with Gemini...")
-    ai_title, ai_description, ai_tags = generate_metadata(video_id, title, transcript)
+    # --- Generate metadata: try Gemini, fall back to prompt-in-description ---
+    try:
+        print("Generating metadata with Gemini...")
+        ai_title, ai_description, ai_tags = generate_metadata(video_id, title, transcript)
+        print(f"Gemini metadata ready: {ai_title}")
+    except Exception as exc:
+        print(f"WARNING: Gemini failed ({exc}). Falling back to prompt-in-description.")
+        ai_title       = f"[DRAFT] {title[:80]}"
+        ai_description = build_claude_prompt(video_id, title, transcript)
+        ai_tags        = []
 
     uploaded_id = upload_private(final_path, ai_title, ai_description, ai_tags)
     print(f"Uploaded as private: https://studio.youtube.com/video/{uploaded_id}/edit")
-    print("Review in YouTube Studio, then flip to Public.")
 
     state["used_video_ids"].append(video_id)
     save_state(state)
