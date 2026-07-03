@@ -144,10 +144,6 @@ def find_best_window(wav_path: Path, clip_seconds: int) -> float:
     return float(best_start)
 
 
-
-
-
-
 def _wrap_title(text: str) -> list[str]:
     """Break a long title into up to TITLE_MAX_LINES lines that fit within
     the frame width at TITLE_FONT_SIZE. If it still doesn't fit in
@@ -194,7 +190,7 @@ def cut_and_reframe(video_path: Path, start: float, clip_seconds: int, out_path:
         f"scale={SHORT_WIDTH}:-2[fg];"
         f"[bg][fg]overlay=(W-w)/2:(H-h)/2,"
         f"drawbox=y=0:h=420:color=black@0.35:t=fill,"
-        f"drawbox=y=H-420:h=420:color=black@0.35:t=fill[base]"
+        f"drawbox=y=ih-420:h=420:color=black@0.35:t=fill[base]"  # FIXED: Changed H-420 to ih-420
     )
 
     # --- Title text overlay at the top, wrapped so it never overflows ---
@@ -346,7 +342,7 @@ def generate_metadata(source_id: str, source_title: str, transcript: str) -> tup
     print("[Gemini] Calling gemini-2.0-flash ...")
 
     response = client.models.generate_content(
-        model="gemini-2.5-flash",
+        model="gemini-2.0-flash", # FIXED: Changed from gemini-2.5-flash to standard 2.0-flash
         contents=prompt,
         config=types.GenerateContentConfig(
             response_mime_type="application/json",
