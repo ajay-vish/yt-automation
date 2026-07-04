@@ -255,6 +255,10 @@ def transcribe_to_srt(clip_video_path: Path, srt_path: Path) -> str:
     for i, seg in enumerate(segments, start=1):
         lines += [str(i), f"{fmt_ts(seg.start)} --> {fmt_ts(seg.end)}", seg.text.strip(), ""]
         parts.append(seg.text.strip())
+        
+    if not lines:
+        lines = ["1", "00:00:00,000 --> 00:00:01,000", "", ""]
+        
     srt_path.write_text("\n".join(lines), encoding="utf-8")
     return " ".join(parts)
 
@@ -264,8 +268,9 @@ def burn_captions(clip_video_path: Path, srt_path: Path, out_path: Path):
         "FontName=Noto Sans Devanagari,FontSize=8,PrimaryColour=&HFFFFFF&,"
         "OutlineColour=&H000000&,BorderStyle=1,Outline=1.2,Alignment=2,MarginV=80"
     )
+    safe_srt_path = str(srt_path.resolve()).replace('\\', '/').replace(':', '\\:')
     run(["ffmpeg", "-y", "-i", str(clip_video_path),
-         "-vf", f"subtitles={srt_path}:force_style='{style}'",
+         "-vf", f"subtitles='{safe_srt_path}':force_style='{style}'",
          "-c:a", "copy", str(out_path)])
 
 
