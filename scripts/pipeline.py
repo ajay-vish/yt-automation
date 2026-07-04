@@ -19,7 +19,7 @@ TITLE_OUTLINE_COLOR = "black"
 TITLE_OUTLINE_WIDTH = 4
 TITLE_SHADOW_COLOR = "black@0.5"
 TITLE_SHADOW_X = TITLE_SHADOW_Y = 3
-TITLE_Y_START = 235
+TITLE_Y_START = 260
 TITLE_MAX_LINES = 2
 TITLE_SIDE_MARGIN = 80
 TITLE_LINE_SPACING = 22
@@ -51,6 +51,7 @@ def load_state():
     state = json.loads(STATE_FILE.read_text()) if STATE_FILE.exists() else {}
     state.setdefault("used_video_ids", [])
     state.setdefault("scheduled_slots", [])
+    state.setdefault("pending_comments", {})
     return state
 
 
@@ -405,6 +406,7 @@ def main():
           f"({'scheduled ' + publish_at if publish_at else 'unscheduled draft'})")
 
     state["used_video_ids"].append(video_id)
+    state["pending_comments"][uploaded_id] = {"source_id": video_id, "title": title}
     save_state(state)
 
 
