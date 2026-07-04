@@ -1,31 +1,4 @@
-"""
-Bhojpuri Folk Song -> YouTube Shorts, fully automated.
-
-What it does, every run:
-  1. Lists all videos on the channel (yt-dlp, no API key needed).
-  2. Picks one video that hasn't been used yet (tracked in state.json).
-  3. Downloads it, finds the loudest/most "sung" ~35s window (librosa) so the
-     clip lands on the chorus instead of silence or talking.
-  4. Cuts that window, reframes it to 9:16 with a blurred-background fill.
-     Overlays the song title at the top and a subscribe GIF at the bottom.
-  5. Transcribes that window locally with faster-whisper and burns captions.
-  6. Calls Gemini 2.0 Flash (free via Google AI Studio) to generate a
-     production-ready title, description, and tags from the transcript.
-  7. Uploads the result to YouTube as PRIVATE with the AI-generated metadata,
-     scheduled to auto-publish at the next available slot
-     (7:30 AM / 1:00 PM / 7:00 PM IST) that isn't already taken by a
-     previously scheduled video.
-  8. Marks the source video as used in state.json so it won't repeat until
-     every video has been used once.
-"""
-
-import json
-import os
-import random
-import subprocess
-import sys
-import textwrap
-
+import json, os, random, subprocess, sys, textwrap, urllib.request
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -36,35 +9,37 @@ import numpy as np
 CHANNEL_URL = "https://www.youtube.com/@manjuvishwakarmalokgeet/videos"
 STATE_FILE = Path("state.json")
 WORK_DIR = Path("work")
-CLIP_SECONDS = 35
+CLIP_SECONDS_RANGE = (15, 22)
 SHORT_WIDTH, SHORT_HEIGHT = 1080, 1920
 
-TITLE_FONT_FILE     = WORK_DIR / "Poppins-Bold.ttf" # Downloaded font supporting both Latin & Hindi without box bugs
-TITLE_FONT_SIZE     = 56                # Clean, premium size
-TITLE_COLOR         = "gold"            # Vibrant gold/yellow
-TITLE_OUTLINE_COLOR = "black"           # High contrast black outline
-TITLE_OUTLINE_WIDTH = 4                 # Crisp text border
-TITLE_SHADOW_COLOR  = "black@0.5"       # Soft drop shadow for depth
-TITLE_SHADOW_X      = 3                 # Shadow offset X
-TITLE_SHADOW_Y      = 3                 # Shadow offset Y
-TITLE_Y_START       = 235               # Moved 20 more down (originally 215)
-TITLE_MAX_LINES     = 2                 # Hard cap to prevent overflow
-TITLE_SIDE_MARGIN   = 80                # Margin clear of edges
-TITLE_LINE_SPACING  = 22                # Spacing between lines (Increased to prevent overlap)
+TITLE_FONT_FILE = WORK_DIR / "Poppins-Bold.ttf"
+TITLE_FONT_SIZE = 56
+TITLE_COLOR = "gold"
+TITLE_OUTLINE_COLOR = "black"
+TITLE_OUTLINE_WIDTH = 4
+TITLE_SHADOW_COLOR = "black@0.5"
+TITLE_SHADOW_X = TITLE_SHADOW_Y = 3
+TITLE_Y_START = 235
+TITLE_MAX_LINES = 2
+TITLE_SIDE_MARGIN = 80
+TITLE_LINE_SPACING = 22
 
-# Asset paths (resolved relative to the repo root, one level up from scripts/)
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 GIF_PATH = _REPO_ROOT / "assets" / "Subscribe.gif"
 BRANDING_PATH = _REPO_ROOT / "assets" / "Branding.png"
+GIF_START, GIF_END = 5, 9
 
-# Subscribe GIF timing (seconds into the clip)
-GIF_START = 5
-GIF_END = 9  # GIF_START + 4 seconds visible
-
-# --- Scheduling ---
 IST = ZoneInfo("Asia/Kolkata")
-SLOT_TIMES_IST = [(7, 30), (13, 0), (19, 0)]  # 7:30 AM, 1:00 PM, 7:00 PM IST
-SLOT_SEARCH_DAYS = 30  # how many days ahead to look for a free slot
+SLOT_TIMES_IST = [(7, 30), (13, 0), (19, 0)]
+SLOT_SEARCH_DAYS = 30
+
+DEFAULT_LANGUAGE = "hi"
+DEFAULT_AUDIO_LANGUAGE = "hi"
+BASE_TAGS = [
+    "bhojpuri", "bhojpuri song", "bhojpuri lokgeet", "lokgeet",
+    "bhojpuri folk song", "indian folk music", "bihar", "up bhojpuri",
+    "purvanchal", "bhojpuri bhajan", "bhojpuri diaspora",
+]
 
 
 def run(cmd, **kwargs):
@@ -73,12 +48,9 @@ def run(cmd, **kwargs):
 
 
 def load_state():
-    if STATE_FILE.exists():
-        state = json.loads(STATE_FILE.read_text())
-    else:
-        state = {}
+    state = json.loads(STATE_FILE.read_text()) if STATE_FILE.exists() else {}
     state.setdefault("used_video_ids", [])
-    state.setdefault("scheduled_slots", [])  # ISO UTC timestamps already claimed
+    state.setdefault("scheduled_slots", [])
     return state
 
 
@@ -86,109 +58,75 @@ def save_state(state):
     STATE_FILE.write_text(json.dumps(state, indent=2))
 
 
-def _prune_past_slots(state):
-    """Drop slots that are already in the past so state.json doesn't grow forever."""
+def get_next_available_slot(state) -> str:
     now = datetime.now(timezone.utc)
     state["scheduled_slots"] = [
         s for s in state["scheduled_slots"]
         if datetime.fromisoformat(s.replace("Z", "+00:00")) > now
     ]
-
-
-def get_next_available_slot(state) -> str:
-    """Return the next 7:30/13:00/19:00 IST slot not already claimed, and
-    reserve it in state (caller must save_state afterward). Returns an
-    RFC3339 UTC timestamp string suitable for YouTube's publishAt field."""
-    _prune_past_slots(state)
     taken = set(state["scheduled_slots"])
-    now_utc = datetime.now(timezone.utc)
     day = datetime.now(IST).date()
 
     for day_offset in range(SLOT_SEARCH_DAYS):
         current_day = day + timedelta(days=day_offset)
         for hour, minute in SLOT_TIMES_IST:
-            candidate_ist = datetime(
-                current_day.year, current_day.month, current_day.day,
-                hour, minute, tzinfo=IST,
-            )
-            candidate_utc = candidate_ist.astimezone(timezone.utc)
-            if candidate_utc <= now_utc:
-                continue  # slot already passed
-            candidate_iso = candidate_utc.isoformat().replace("+00:00", "Z")
-            if candidate_iso in taken:
-                continue  # slot already booked by a previous video
-            state["scheduled_slots"].append(candidate_iso)
-            return candidate_iso
-
+            candidate = datetime(current_day.year, current_day.month, current_day.day,
+                                  hour, minute, tzinfo=IST).astimezone(timezone.utc)
+            if candidate <= now:
+                continue
+            iso = candidate.isoformat().replace("+00:00", "Z")
+            if iso in taken:
+                continue
+            state["scheduled_slots"].append(iso)
+            return iso
     raise RuntimeError(f"No available slot found in the next {SLOT_SEARCH_DAYS} days.")
 
 
 def cookie_args():
-    """If a cookies.txt file is present (see README), pass it to yt-dlp so
-    YouTube doesn't block requests coming from GitHub's shared IPs.
-    If the cookies are in raw document.cookie format, we automatically
-    convert them to Netscape format first."""
     cookies_path = os.environ.get("YT_COOKIES_FILE", "cookies.txt")
-    if os.path.exists(cookies_path):
-        try:
-            content = Path(cookies_path).read_text(encoding="utf-8").strip()
-            # Convert raw document.cookie string to Netscape format if it's not already Netscape format
-            if content and not content.startswith("#") and "\t" not in content:
-                print("[cookies] Raw document.cookie format detected in cookies.txt. Converting to Netscape format...")
-                netscape_content = ["# Netscape HTTP Cookie File", "# Converted from raw document.cookie"]
-                for part in content.split(";"):
-                    part = part.strip()
-                    if not part or "=" not in part:
-                        continue
+    if not os.path.exists(cookies_path):
+        return []
+    try:
+        content = Path(cookies_path).read_text(encoding="utf-8").strip()
+        if content and not content.startswith("#") and "\t" not in content:
+            lines = ["# Netscape HTTP Cookie File"]
+            for part in content.split(";"):
+                part = part.strip()
+                if part and "=" in part:
                     name, val = part.split("=", 1)
-                    # Default domain is .youtube.com for YouTube downloads
-                    netscape_content.append(f".youtube.com\tTRUE\t/\tTRUE\t2147483647\t{name.strip()}\t{val.strip()}")
-                Path(cookies_path).write_text("\n".join(netscape_content) + "\n", encoding="utf-8")
-                print("[cookies] Conversion complete.")
-        except Exception as e:
-            print(f"[cookies] Warning: Failed to inspect/convert cookies.txt: {e}")
-        return ["--cookies", cookies_path]
-    return []
+                    lines.append(f".youtube.com\tTRUE\t/\tTRUE\t2147483647\t{name.strip()}\t{val.strip()}")
+            Path(cookies_path).write_text("\n".join(lines) + "\n", encoding="utf-8")
+    except Exception as e:
+        print(f"[cookies] Warning: {e}")
+    return ["--cookies", cookies_path]
 
 
 def list_channel_videos():
-    """Return [{"id": ..., "title": ...}, ...] for every video on the channel."""
-    try:
-        out = subprocess.run(
-            ["yt-dlp", *cookie_args(), "--remote-components", "ejs:github", "--flat-playlist", "-J", CHANNEL_URL],
-            check=True, capture_output=True, text=True,
-        )
-        data = json.loads(out.stdout)
-        return [{"id": e["id"], "title": e.get("title", e["id"])} for e in data["entries"]]
-    except subprocess.CalledProcessError as e:
-        print(f"[Error] yt-dlp command failed with exit code {e.returncode}")
-        if e.stderr:
-            print(f"[stderr] {e.stderr.strip()}")
-        if e.stdout:
-            print(f"[stdout] {e.stdout.strip()}")
-        raise
+    out = subprocess.run(
+        ["yt-dlp", *cookie_args(), "--remote-components", "ejs:github", "--flat-playlist", "-J", CHANNEL_URL],
+        check=True, capture_output=True, text=True,
+    )
+    data = json.loads(out.stdout)
+    return [{"id": e["id"], "title": e.get("title", e["id"])} for e in data["entries"]]
+
 
 def pick_video(state):
     videos = list_channel_videos()
     used = set(state["used_video_ids"])
     unused = [v for v in videos if v["id"] not in used]
     if not unused:
-        # Every video has been used at least once -- start a new cycle.
         state["used_video_ids"] = []
         unused = videos
-    choice = random.choice(unused)
-    return choice, videos
+    return random.choice(unused)
 
 
 def download_video(video_id, dest: Path) -> Path:
     dest.mkdir(parents=True, exist_ok=True)
-    out_template = str(dest / f"{video_id}.%(ext)s")
     run([
-        "yt-dlp", *cookie_args(),
-        "--remote-components", "ejs:github",
+        "yt-dlp", *cookie_args(), "--remote-components", "ejs:github",
         "-f", "bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/best[height<=1080]",
         "--merge-output-format", "mp4",
-        "-o", out_template,
+        "-o", str(dest / f"{video_id}.%(ext)s"),
         f"https://www.youtube.com/watch?v={video_id}",
     ])
     matches = list(dest.glob(f"{video_id}.mp4"))
@@ -202,84 +140,47 @@ def extract_audio(video_path: Path, wav_path: Path):
 
 
 def find_best_window(wav_path: Path, clip_seconds: int) -> float:
-    """Return the start time (seconds) of the loudest clip_seconds window,
-    ignoring the first and last 5% of the track (usually intro/outro)."""
     y, sr = librosa.load(str(wav_path), sr=None)
     duration = librosa.get_duration(y=y, sr=sr)
     if duration <= clip_seconds:
         return 0.0
-
-    hop = sr  # 1-second resolution
-    rms = librosa.feature.rms(y=y, frame_length=sr, hop_length=hop)[0]  # 1 value/sec
+    rms = librosa.feature.rms(y=y, frame_length=sr, hop_length=sr)[0]
     margin = max(1, int(duration * 0.05))
-    window = clip_seconds
-
     best_start, best_score = margin, -1
-    for start in range(margin, max(margin + 1, int(duration) - window - margin)):
-        score = np.mean(rms[start:start + window])
+    for start in range(margin, max(margin + 1, int(duration) - clip_seconds - margin)):
+        score = np.mean(rms[start:start + clip_seconds])
         if score > best_score:
             best_score, best_start = score, start
     return float(best_start)
 
 
 def download_font(dest_path: Path):
-    """Download Poppins-Bold from Google Fonts, which fully supports both
-    Latin and Devanagari characters in a single file to eliminate box characters."""
-    import urllib.request
     url = "https://github.com/google/fonts/raw/main/ofl/poppins/Poppins-Bold.ttf"
-    print(f"[font] Downloading premium Poppins font from {url}...")
-    try:
-        # Set User-Agent to prevent HTTP 403 Forbidden issues
-        req = urllib.request.Request(
-            url,
-            headers={'User-Agent': 'Mozilla/5.0'}
-        )
-        with urllib.request.urlopen(req) as response, open(dest_path, 'wb') as out_file:
-            out_file.write(response.read())
-        print("[font] Font downloaded successfully.")
-    except Exception as e:
-        print(f"[font] Failed to download font: {e}")
-        raise
+    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+    with urllib.request.urlopen(req) as response, open(dest_path, "wb") as f:
+        f.write(response.read())
 
 
 def _wrap_title(text: str) -> list[str]:
-    """Break a long title into up to TITLE_MAX_LINES lines that fit within
-    the frame width at TITLE_FONT_SIZE. If it still doesn't fit in
-    TITLE_MAX_LINES, the last line is truncated with an ellipsis so it
-    never overflows the video."""
-    # Rough average glyph width for Noto Sans -- good enough to size-wrap by.
     avg_char_width = TITLE_FONT_SIZE * 0.56
-    max_chars_per_line = max(1, int((SHORT_WIDTH - TITLE_SIDE_MARGIN) / avg_char_width))
-
-    lines = textwrap.wrap(text, width=max_chars_per_line) or [text]
-
+    max_chars = max(1, int((SHORT_WIDTH - TITLE_SIDE_MARGIN) / avg_char_width))
+    lines = textwrap.wrap(text, width=max_chars) or [text]
     if len(lines) > TITLE_MAX_LINES:
         lines = lines[:TITLE_MAX_LINES]
         last = lines[-1]
         if len(last) > 3:
-            last = last[: max_chars_per_line - 1].rstrip() + "\u2026"
+            last = last[:max_chars - 1].rstrip() + "\u2026"
         lines[-1] = last
-
     return lines
 
 
 def _escape_drawtext(text: str) -> str:
-    """Escape characters that break FFmpeg drawtext's text='...' syntax."""
     return text.replace("\\", "\\\\").replace("'", "\\'").replace(":", "\\:")
 
 
 def cut_and_reframe(video_path: Path, start: float, clip_seconds: int, out_path: Path, title: str = ""):
-    """Trim to the window and convert to 9:16 with a blurred, filled background.
-
-    Overlays:
-    - Title text at the top (first segment of title split on '|').
-    - Branding permanently displayed at the bottom center.
-    - Subscribe GIF displayed from GIF_START to GIF_END centered above the Branding.
-    """
-    # --- Derive display title ---
     display_title = title.split("|")[0].strip() if title else ""
 
-    # --- Base: blur background + foreground composite ---
     base_vf = (
         f"[0:v]trim=start={start}:duration={clip_seconds},setpts=PTS-STARTPTS,"
         f"scale={SHORT_WIDTH}:{SHORT_HEIGHT}:force_original_aspect_ratio=increase,crop={SHORT_WIDTH}:{SHORT_HEIGHT},"
@@ -289,8 +190,8 @@ def cut_and_reframe(video_path: Path, start: float, clip_seconds: int, out_path:
         f"[bg][fg]overlay=(W-w)/2:(H-h)/2[base]"
     )
 
-    # --- Title text overlay at the top, wrapped so it never overflows ---
     title_vf_parts = []
+    last_label = "base"
     if display_title:
         lines = _wrap_title(display_title)
         line_height = TITLE_FONT_SIZE + TITLE_LINE_SPACING
@@ -299,72 +200,39 @@ def cut_and_reframe(video_path: Path, start: float, clip_seconds: int, out_path:
             out_label = f"title{i}"
             y_expr = f"{TITLE_Y_START}+{i * line_height}" if i else str(TITLE_Y_START)
             title_vf_parts.append(
-                f"[{prev_label}]drawtext="
-                f"text='{_escape_drawtext(line)}':"
-                f"fontfile='{str(TITLE_FONT_FILE)}':"
-                f"fontsize={TITLE_FONT_SIZE}:"
-                f"fontcolor={TITLE_COLOR}:"
-                f"borderw={TITLE_OUTLINE_WIDTH}:"
-                f"bordercolor={TITLE_OUTLINE_COLOR}:"
-                f"shadowx={TITLE_SHADOW_X}:shadowy={TITLE_SHADOW_Y}:"
-                f"shadowcolor={TITLE_SHADOW_COLOR}:"
-                f"x=(w-text_w)/2:"
-                f"y={y_expr}"
-                f"[{out_label}]"
+                f"[{prev_label}]drawtext=text='{_escape_drawtext(line)}':"
+                f"fontfile='{TITLE_FONT_FILE}':fontsize={TITLE_FONT_SIZE}:fontcolor={TITLE_COLOR}:"
+                f"borderw={TITLE_OUTLINE_WIDTH}:bordercolor={TITLE_OUTLINE_COLOR}:"
+                f"shadowx={TITLE_SHADOW_X}:shadowy={TITLE_SHADOW_Y}:shadowcolor={TITLE_SHADOW_COLOR}:"
+                f"x=(w-text_w)/2:y={y_expr}[{out_label}]"
             )
             prev_label = out_label
         last_label = prev_label
-    else:
-        last_label = "base"
     title_vf = ";".join(title_vf_parts)
 
-    # --- Scaling of Assets ---
-    # Input [1] is Subscribe.gif, Input [2] is Branding.png
-    # Branding logo: scaled to 546 (455 * 1.20 = 546), added yuva420p format,
-    # and applied geq filter to add 10% border-radius (H*0.1).
     scale_vf = (
         f"[1:v]scale=350:-1[gif_scaled];"
         f"[2:v]scale=546:-1,format=yuva420p,"
         f"geq=lum='p(X,Y)':cb='p(X,Y)':cr='p(X,Y)':a='if(gt(abs(W/2-X),W/2-(H*0.1))*gt(abs(H/2-Y),H/2-(H*0.1)),"
         f"if(lte(hypot((H*0.1)-(W/2-abs(W/2-X)),(H*0.1)-(H/2-abs(H/2-Y))),(H*0.1)),p(X,Y),0),p(X,Y))'[brand_scaled]"
     )
-
-    # --- Permanent Branding Overlay (Bottom Center, 120px from bottom edge) ---
-    brand_vf = (
-        f"[{last_label}][brand_scaled]overlay="
-        f"x=(W-w)/2:"
-        f"y=H-h-120:"
-        f"eof_action=repeat[branded]"
-    )
-
-    # --- Temporary Subscribe GIF Overlay (Centered above the branding logo) ---
+    brand_vf = f"[{last_label}][brand_scaled]overlay=x=(W-w)/2:y=H-h-120:eof_action=repeat[branded]"
     gif_vf = (
         f"[gif_scaled]setpts=PTS-STARTPTS+{GIF_START}/TB[gif_timed];"
-        f"[branded][gif_timed]overlay="
-        f"x=(W-w)/2:"
-        f"y=H-h-260:"
-        f"enable='between(t,{GIF_START},{GIF_END})':"
-        f"eof_action=pass[vout]"
+        f"[branded][gif_timed]overlay=x=(W-w)/2:y=H-h-260:"
+        f"enable='between(t,{GIF_START},{GIF_END})':eof_action=pass[vout]"
     )
 
-    # Assemble full filter_complex
     filter_parts = [base_vf]
     if title_vf:
         filter_parts.append(title_vf)
-    filter_parts.append(scale_vf)
-    filter_parts.append(brand_vf)
-    filter_parts.append(gif_vf)
+    filter_parts += [scale_vf, brand_vf, gif_vf]
     filter_complex = ";".join(filter_parts)
-
-    af = f"[0:a]atrim=start={start}:duration={clip_seconds},asetpts=PTS-STARTPTS[aout]"
-    filter_complex = f"{filter_complex};{af}"
+    filter_complex += f";[0:a]atrim=start={start}:duration={clip_seconds},asetpts=PTS-STARTPTS[aout]"
 
     run([
-        "ffmpeg", "-y",
-        "-i", str(video_path),
-        "-ignore_loop", "0",   # Let FFmpeg read all GIF frames
-        "-i", str(GIF_PATH),
-        "-i", str(BRANDING_PATH), # Permanent branding asset
+        "ffmpeg", "-y", "-i", str(video_path), "-ignore_loop", "0",
+        "-i", str(GIF_PATH), "-i", str(BRANDING_PATH),
         "-filter_complex", filter_complex,
         "-map", "[vout]", "-map", "[aout]",
         "-c:v", "libx264", "-c:a", "aac", "-shortest", str(out_path),
@@ -372,8 +240,6 @@ def cut_and_reframe(video_path: Path, start: float, clip_seconds: int, out_path:
 
 
 def transcribe_to_srt(clip_video_path: Path, srt_path: Path) -> str:
-    """Uses faster-whisper (local, free) to transcribe the clip and write an SRT.
-    Returns the plain transcript text too (used in the Claude prompt)."""
     from faster_whisper import WhisperModel
 
     model = WhisperModel("small", device="cpu", compute_type="int8")
@@ -382,130 +248,87 @@ def transcribe_to_srt(clip_video_path: Path, srt_path: Path) -> str:
     def fmt_ts(t):
         h, rem = divmod(t, 3600)
         m, s = divmod(rem, 60)
-        ms = int((s - int(s)) * 1000)
-        return f"{int(h):02d}:{int(m):02d}:{int(s):02d},{ms:03d}"
+        return f"{int(h):02d}:{int(m):02d}:{int(s):02d},{int((s - int(s)) * 1000):03d}"
 
-    lines, transcript_parts = [], []
+    lines, parts = [], []
     for i, seg in enumerate(segments, start=1):
-        lines.append(str(i))
-        lines.append(f"{fmt_ts(seg.start)} --> {fmt_ts(seg.end)}")
-        lines.append(seg.text.strip())
-        lines.append("")
-        transcript_parts.append(seg.text.strip())
+        lines += [str(i), f"{fmt_ts(seg.start)} --> {fmt_ts(seg.end)}", seg.text.strip(), ""]
+        parts.append(seg.text.strip())
     srt_path.write_text("\n".join(lines), encoding="utf-8")
-    return " ".join(transcript_parts)
+    return " ".join(parts)
 
 
 def burn_captions(clip_video_path: Path, srt_path: Path, out_path: Path):
-    # Force a highly readable, premium style: white text, clean black outline, bottom-centered.
-    # Use Noto Sans Devanagari for proper Hindi/Bhojpuri script rendering.
     style = (
-        "FontName=Noto Sans Devanagari,"
-        "FontSize=8,"                   # Reduced size by half for better visual proportion
-        "PrimaryColour=&HFFFFFF&,"      # Crisp white
-        "OutlineColour=&H000000&,"      # Solid black outline
-        "BorderStyle=1,"
-        "Outline=1.2,"                  # Adjusted border thickness to match the smaller font size
-        "Alignment=2,"                  # Bottom-center alignment
-        "MarginV=80"                    # Moved 10 more down (originally 90, now 80)
+        "FontName=Noto Sans Devanagari,FontSize=8,PrimaryColour=&HFFFFFF&,"
+        "OutlineColour=&H000000&,BorderStyle=1,Outline=1.2,Alignment=2,MarginV=80"
     )
-    run([
-        "ffmpeg", "-y", "-i", str(clip_video_path),
-        "-vf", f"subtitles={srt_path}:force_style='{style}'",
-        "-c:a", "copy", str(out_path),
-    ])
+    run(["ffmpeg", "-y", "-i", str(clip_video_path),
+         "-vf", f"subtitles={srt_path}:force_style='{style}'",
+         "-c:a", "copy", str(out_path)])
 
 
 def generate_metadata(source_id: str, source_title: str, transcript: str) -> tuple[str, str, list[str]]:
-    """Call Gemini 2.5 Flash to produce a production-ready title, description,
-    and tags. Returns (title, description, tags). Raises on any failure so the
-    caller can decide the fallback strategy."""
-    import json as _json
-    import traceback
     from google import genai
     from google.genai import types
 
-    # --- 1. Confirm the API key is present ---
     api_key = os.environ.get("GEMINI_API_KEY", "")
     if not api_key:
         raise RuntimeError("GEMINI_API_KEY env var is not set.")
-    print(f"[Gemini] API key present (length={len(api_key)}, prefix={api_key[:6]}...)")
 
     client = genai.Client(api_key=api_key)
-
     prompt = (
         f'You are a YouTube channel manager for a Bhojpuri folk songs (lokgeet) channel.\n\n'
         f'Source song: "{source_title}"\n'
         f'Full video: https://www.youtube.com/watch?v={source_id}\n\n'
-        f'Transcript of the 35-second Short clip (Hindi/Bhojpuri, may have errors):\n'
-        f'"{transcript.strip()}"\n\n'
+        f'Transcript of the Short clip (Hindi/Bhojpuri, may have errors):\n"{transcript.strip()}"\n\n'
         f'Return a JSON object with exactly these three keys:\n'
-        f'  "title"       \u2013 YouTube Shorts title, under 100 characters.\n'
-        f'                   Format: Song Name \u2013 Singer | Bhojpuri Folk Song #Shorts\n'
-        f'                   Guess / fix song name and singer from context if needed.\n'
-        f'  "description" \u2013 3-5 line YouTube description. Include the song name, one\n'
-        f'                   evocative line about the song, the full video link\n'
-        f'                   (https://www.youtube.com/watch?v={source_id}), and hashtags.\n'
-        f'  "tags"        \u2013 JSON array of 15-20 tag strings mixing broad terms\n'
-        f'                   (bhojpuri, folk song, lokgeet, indian folk music) and\n'
-        f'                   specific terms (song name, singer name, region).\n\n'
-        f'Return only valid JSON \u2014 no markdown fences, no explanation.'
+        f'  "title" - YouTube Shorts title, under 100 characters, format: '
+        f'Song Name - Singer | Bhojpuri Folk Song #Shorts\n'
+        f'  "description" - 3-5 lines including song name, one evocative line, the full video link '
+        f'(https://www.youtube.com/watch?v={source_id}), #Bhojpuri, and a region hashtag '
+        f'(#Bihar, #UP, or #Purvanchal)\n'
+        f'  "tags" - JSON array of 15-20 strings mixing broad terms (bhojpuri, folk song, lokgeet, '
+        f'indian folk music), regional terms (bihar, up bhojpuri, purvanchal), and specific terms '
+        f'(song name, singer, occasion)\n\n'
+        f'Return only valid JSON - no markdown fences, no explanation.'
     )
-
-    # --- 2. Log the prompt being sent ---
-    print(f"[Gemini] Sending prompt ({len(prompt)} chars):\n{prompt[:300]}{'...' if len(prompt) > 300 else ''}")
-    print("[Gemini] Calling gemini-2.5-flash ...")
 
     response = client.models.generate_content(
-        model="gemini-2.5-flash",
-        contents=prompt,
-        config=types.GenerateContentConfig(
-            response_mime_type="application/json",
-        ),
+        model="gemini-2.5-flash", contents=prompt,
+        config=types.GenerateContentConfig(response_mime_type="application/json"),
     )
-
-    # --- 3. Log the raw response ---
-    print(f"[Gemini] Raw response:\n{response.text}")
-
-    # --- 4. Parse and log each field ---
-    data = _json.loads(response.text)
-    ai_title       = str(data.get("title", source_title))[:100]
-    ai_description = str(data.get("description", ""))
-    ai_tags        = [str(t) for t in data.get("tags", [])][:20]
-
-    print(f"[Gemini] title       : {ai_title}")
-    print(f"[Gemini] description : {ai_description[:120]}{'...' if len(ai_description) > 120 else ''}")
-    print(f"[Gemini] tags ({len(ai_tags)})   : {ai_tags}")
-
-    return ai_title, ai_description, ai_tags
-
-
-def build_claude_prompt(source_id: str, source_title: str, transcript: str) -> str:
-    """Build the prompt stored in the uploaded video's description.
-    Open the video in YouTube Studio, copy the description into Claude / ChatGPT,
-    get title/description/tags, then flip the video to Public."""
+    data = json.loads(response.text)
     return (
-        f'I run a YouTube channel of Bhojpuri folk songs (lokgeet). I\'ve made a Short from this song: "{source_title}" '
-        f"(full video: https://www.youtube.com/watch?v={source_id}).\n\n"
-        f"Here is a rough transcript of the clip used in the Short (Hindi/Bhojpuri, may contain transcription errors):\n"
-        f'"{transcript.strip()}"\n\n'
-        f"Please give me:\n\n"
-        f"A YouTube Shorts TITLE (under 100 characters) in the format: Song Name \u2013 Singer | Bhojpuri Folk Song #Shorts "
-        f"(fix/guess the singer and song name from context if needed)\n"
-        f"A YouTube DESCRIPTION (3-5 lines) that includes the song name, a short evocative line about the song, "
-        f"the actual full video link I provided above (not a placeholder), and relevant hashtags.\n"
-        f"15-20 YouTube TAGS (comma-separated) mixing broad terms (bhojpuri, folk song, lokgeet, indian folk music) "
-        f"and specific terms (song name, singer name, region)."
+        str(data.get("title", source_title))[:100],
+        str(data.get("description", "")),
+        [str(t) for t in data.get("tags", [])][:20],
     )
+
+
+def build_fallback_prompt(source_id: str, source_title: str, transcript: str) -> str:
+    return (
+        f'I run a YouTube channel of Bhojpuri folk songs (lokgeet). I\'ve made a Short from this song: '
+        f'"{source_title}" (full video: https://www.youtube.com/watch?v={source_id}).\n\n'
+        f'Transcript of the clip (Hindi/Bhojpuri, may contain errors):\n"{transcript.strip()}"\n\n'
+        f'Please give me a TITLE (under 100 chars, format: Song Name - Singer | Bhojpuri Folk Song #Shorts), '
+        f'a DESCRIPTION (3-5 lines with song name, an evocative line, the video link, and hashtags), '
+        f'and 15-20 comma-separated TAGS mixing broad and specific terms.'
+    )
+
+
+def merge_tags(ai_tags: list[str]) -> list[str]:
+    seen, merged = set(), []
+    for t in ai_tags + BASE_TAGS:
+        key = t.strip().lower()
+        if key and key not in seen:
+            seen.add(key)
+            merged.append(t.strip())
+    return merged[:20]
 
 
 def upload_private(video_path: Path, title: str, description: str, tags: list[str],
                     publish_at: str | None = None) -> str:
-    """Upload the video as PRIVATE with the supplied metadata.
-
-    If publish_at is given (an RFC3339 UTC timestamp), YouTube will
-    automatically flip the video to Public at that time.
-    """
     from google.oauth2.credentials import Credentials
     from googleapiclient.discovery import build
     from googleapiclient.http import MediaFileUpload
@@ -526,21 +349,22 @@ def upload_private(video_path: Path, title: str, description: str, tags: list[st
     body = {
         "snippet": {
             "title": title[:100],
-            "description": description[:5000],  # YouTube description hard limit
+            "description": description[:5000],
             "tags": tags,
-            "categoryId": "10",  # Music
+            "categoryId": "10",
+            "defaultLanguage": DEFAULT_LANGUAGE,
+            "defaultAudioLanguage": DEFAULT_AUDIO_LANGUAGE,
         },
         "status": status,
     }
     media = MediaFileUpload(str(video_path), chunksize=-1, resumable=True, mimetype="video/mp4")
-    request = youtube.videos().insert(part="snippet,status", body=body, media_body=media)
-    response = request.execute()
+    response = youtube.videos().insert(part="snippet,status", body=body, media_body=media).execute()
     return response["id"]
 
 
 def main():
     state = load_state()
-    video, _all_videos = pick_video(state)
+    video = pick_video(state)
     video_id, title = video["id"], video["title"]
     print(f"Selected video: {title} ({video_id})")
 
@@ -549,15 +373,14 @@ def main():
 
     wav_path = WORK_DIR / f"{video_id}.wav"
     extract_audio(raw_path, wav_path)
-    start = find_best_window(wav_path, CLIP_SECONDS)
-    print(f"Best window starts at {start:.0f}s")
+
+    clip_seconds = random.randint(*CLIP_SECONDS_RANGE)
+    start = find_best_window(wav_path, clip_seconds)
+    print(f"Clip length {clip_seconds}s, best window starts at {start:.0f}s")
 
     clip_path = WORK_DIR / f"{video_id}_clip.mp4"
-    
-    # Ensure premium multilingual Poppins font is downloaded before frame reframing
     download_font(TITLE_FONT_FILE)
-    
-    cut_and_reframe(raw_path, start, CLIP_SECONDS, clip_path, title=title)
+    cut_and_reframe(raw_path, start, clip_seconds, clip_path, title=title)
 
     srt_path = WORK_DIR / f"{video_id}.srt"
     transcript = transcribe_to_srt(clip_path, srt_path)
@@ -565,32 +388,24 @@ def main():
     final_path = WORK_DIR / f"{video_id}_final.mp4"
     burn_captions(clip_path, srt_path, final_path)
 
-    # --- Generate metadata: try Gemini, fall back to prompt-in-description ---
-    # Only schedule an auto-publish slot when Gemini actually succeeds --
-    # fallback "[DRAFT]" uploads stay private/unscheduled for manual review.
     publish_at = None
     try:
-        print("Generating metadata with Gemini...")
         ai_title, ai_description, ai_tags = generate_metadata(video_id, title, transcript)
-        print(f"Gemini metadata ready: {ai_title}")
         publish_at = get_next_available_slot(state)
-        print(f"Scheduled to auto-publish at: {publish_at} (UTC)")
+        print(f"Scheduled to auto-publish at {publish_at} (UTC)")
     except Exception as exc:
-        print(f"WARNING: Gemini failed ({exc}). Falling back to prompt-in-description.")
-        ai_title       = f"[DRAFT] {title[:80]}"
-        ai_description = build_claude_prompt(video_id, title, transcript)
-        ai_tags        = []
+        print(f"WARNING: Gemini failed ({exc}). Falling back to draft.")
+        ai_title = f"[DRAFT] {title[:80]}"
+        ai_description = build_fallback_prompt(video_id, title, transcript)
+        ai_tags = []
 
+    ai_tags = merge_tags(ai_tags)
     uploaded_id = upload_private(final_path, ai_title, ai_description, ai_tags, publish_at=publish_at)
-    if publish_at:
-        print(f"Uploaded as private, scheduled to go public at {publish_at}: "
-              f"https://studio.youtube.com/video/{uploaded_id}/edit")
-    else:
-        print(f"Uploaded as private (unscheduled draft): https://studio.youtube.com/video/{uploaded_id}/edit")
+    print(f"Uploaded: https://studio.youtube.com/video/{uploaded_id}/edit "
+          f"({'scheduled ' + publish_at if publish_at else 'unscheduled draft'})")
 
     state["used_video_ids"].append(video_id)
     save_state(state)
-    print("Done.")
 
 
 if __name__ == "__main__":
