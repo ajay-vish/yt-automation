@@ -11,8 +11,10 @@ What it does, every run:
   5. Transcribes that window locally with faster-whisper and burns captions.
   6. Calls Gemini 2.0 Flash (free via Google AI Studio) to generate a
      production-ready title, description, and tags from the transcript.
-  7. Uploads the result to YouTube as PRIVATE with the AI-generated metadata.
-     Flip to Public in YouTube Studio once you've reviewed it.
+  7. Uploads the result to YouTube as PRIVATE with the AI-generated metadata,
+     scheduled to auto-publish at the next available slot
+     (7:30 AM / 1:00 PM / 7:00 PM IST) that isn't already taken by a
+     previously scheduled video.
   8. Marks the source video as used in state.json so it won't repeat until
      every video has been used once.
 """
@@ -24,7 +26,9 @@ import subprocess
 import sys
 import textwrap
 
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import librosa
 import numpy as np
@@ -43,7 +47,7 @@ TITLE_OUTLINE_WIDTH = 4                 # Crisp text border
 TITLE_SHADOW_COLOR  = "black@0.5"       # Soft drop shadow for depth
 TITLE_SHADOW_X      = 3                 # Shadow offset X
 TITLE_SHADOW_Y      = 3                 # Shadow offset Y
-TITLE_Y_START       = 215               # Moved 10 more down (originally 205)
+TITLE_Y_START       = 235               # Moved 20 more down (originally 215)
 TITLE_MAX_LINES     = 2                 # Hard cap to prevent overflow
 TITLE_SIDE_MARGIN   = 80                # Margin clear of edges
 TITLE_LINE_SPACING  = 22                # Spacing between lines (Increased to prevent overlap)
@@ -57,6 +61,11 @@ BRANDING_PATH = _REPO_ROOT / "assets" / "Branding.png"
 GIF_START = 5
 GIF_END = 9  # GIF_START + 4 seconds visible
 
+# --- Scheduling ---
+IST = ZoneInfo("Asia/Kolkata")
+SLOT_TIMES_IST = [(7, 30), (13, 0), (19, 0)]  # 7:30 AM, 1:00 PM, 7:00 PM IST
+SLOT_SEARCH_DAYS = 30  # how many days ahead to look for a free slot
+
 
 def run(cmd, **kwargs):
     print("+", " ".join(cmd))
@@ -65,12 +74,54 @@ def run(cmd, **kwargs):
 
 def load_state():
     if STATE_FILE.exists():
-        return json.loads(STATE_FILE.read_text())
-    return {"used_video_ids": []}
+        state = json.loads(STATE_FILE.read_text())
+    else:
+        state = {}
+    state.setdefault("used_video_ids", [])
+    state.setdefault("scheduled_slots", [])  # ISO UTC timestamps already claimed
+    return state
 
 
 def save_state(state):
     STATE_FILE.write_text(json.dumps(state, indent=2))
+
+
+def _prune_past_slots(state):
+    """Drop slots that are already in the past so state.json doesn't grow forever."""
+    now = datetime.now(timezone.utc)
+    state["scheduled_slots"] = [
+        s for s in state["scheduled_slots"]
+        if datetime.fromisoformat(s.replace("Z", "+00:00")) > now
+    ]
+
+
+def get_next_available_slot(state) -> str:
+    """Return the next 7:30/13:00/19:00 IST slot not already claimed, and
+    reserve it in state (caller must save_state afterward). Returns an
+    RFC3339 UTC timestamp string suitable for YouTube's publishAt field."""
+    _prune_past_slots(state)
+    taken = set(state["scheduled_slots"])
+    now_utc = datetime.now(timezone.utc)
+    day = datetime.now(IST).date()
+
+    for day_offset in range(SLOT_SEARCH_DAYS):
+        current_day = day + timedelta(days=day_offset)
+        for hour, minute in SLOT_TIMES_IST:
+            candidate_ist = datetime(
+                current_day.year, current_day.month, current_day.day,
+                hour, minute, tzinfo=IST,
+            )
+            candidate_utc = candidate_ist.astimezone(timezone.utc)
+            if candidate_utc <= now_utc:
+                continue  # slot already passed
+            candidate_iso = candidate_utc.isoformat().replace("+00:00", "Z")
+            if candidate_iso in taken:
+                continue  # slot already booked by a previous video
+            state["scheduled_slots"].append(candidate_iso)
+            return candidate_iso
+
+    raise RuntimeError(f"No available slot found in the next {SLOT_SEARCH_DAYS} days.")
+
 
 def cookie_args():
     """If a cookies.txt file is present (see README), pass it to yt-dlp so
@@ -448,8 +499,13 @@ def build_claude_prompt(source_id: str, source_title: str, transcript: str) -> s
     )
 
 
-def upload_private(video_path: Path, title: str, description: str, tags: list[str]) -> str:
-    """Upload the video as PRIVATE with the supplied metadata."""
+def upload_private(video_path: Path, title: str, description: str, tags: list[str],
+                    publish_at: str | None = None) -> str:
+    """Upload the video as PRIVATE with the supplied metadata.
+
+    If publish_at is given (an RFC3339 UTC timestamp), YouTube will
+    automatically flip the video to Public at that time.
+    """
     from google.oauth2.credentials import Credentials
     from googleapiclient.discovery import build
     from googleapiclient.http import MediaFileUpload
@@ -463,6 +519,10 @@ def upload_private(video_path: Path, title: str, description: str, tags: list[st
     )
     youtube = build("youtube", "v3", credentials=creds)
 
+    status = {"privacyStatus": "private", "selfDeclaredMadeForKids": False}
+    if publish_at:
+        status["publishAt"] = publish_at
+
     body = {
         "snippet": {
             "title": title[:100],
@@ -470,7 +530,7 @@ def upload_private(video_path: Path, title: str, description: str, tags: list[st
             "tags": tags,
             "categoryId": "10",  # Music
         },
-        "status": {"privacyStatus": "private", "selfDeclaredMadeForKids": False},
+        "status": status,
     }
     media = MediaFileUpload(str(video_path), chunksize=-1, resumable=True, mimetype="video/mp4")
     request = youtube.videos().insert(part="snippet,status", body=body, media_body=media)
@@ -506,18 +566,27 @@ def main():
     burn_captions(clip_path, srt_path, final_path)
 
     # --- Generate metadata: try Gemini, fall back to prompt-in-description ---
+    # Only schedule an auto-publish slot when Gemini actually succeeds --
+    # fallback "[DRAFT]" uploads stay private/unscheduled for manual review.
+    publish_at = None
     try:
         print("Generating metadata with Gemini...")
         ai_title, ai_description, ai_tags = generate_metadata(video_id, title, transcript)
         print(f"Gemini metadata ready: {ai_title}")
+        publish_at = get_next_available_slot(state)
+        print(f"Scheduled to auto-publish at: {publish_at} (UTC)")
     except Exception as exc:
         print(f"WARNING: Gemini failed ({exc}). Falling back to prompt-in-description.")
         ai_title       = f"[DRAFT] {title[:80]}"
         ai_description = build_claude_prompt(video_id, title, transcript)
         ai_tags        = []
 
-    uploaded_id = upload_private(final_path, ai_title, ai_description, ai_tags)
-    print(f"Uploaded as private: https://studio.youtube.com/video/{uploaded_id}/edit")
+    uploaded_id = upload_private(final_path, ai_title, ai_description, ai_tags, publish_at=publish_at)
+    if publish_at:
+        print(f"Uploaded as private, scheduled to go public at {publish_at}: "
+              f"https://studio.youtube.com/video/{uploaded_id}/edit")
+    else:
+        print(f"Uploaded as private (unscheduled draft): https://studio.youtube.com/video/{uploaded_id}/edit")
 
     state["used_video_ids"].append(video_id)
     save_state(state)
