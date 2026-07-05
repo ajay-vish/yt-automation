@@ -30,7 +30,7 @@ BRANDING_PATH = _REPO_ROOT / "assets" / "Branding.png"
 GIF_START, GIF_END = 5, 9
 
 IST = ZoneInfo("Asia/Kolkata")
-SLOT_TIMES_IST = [(7, 30), (13, 0), (19, 0)]
+SLOT_TIMES_IST = [(13, 0), (19, 0), (21, 0)]
 SLOT_SEARCH_DAYS = 30
 
 DEFAULT_LANGUAGE = "hi"
