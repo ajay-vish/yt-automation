@@ -141,15 +141,40 @@ def extract_audio(video_path: Path, wav_path: Path):
 
 
 def find_best_window(wav_path: Path, clip_seconds: int) -> float:
+    """Pick a clip window that is loud overall AND opens right on a strong
+    onset (a beat/vocal entrance), instead of starting mid-note. Shorts get
+    swiped away in under a second if the first frame doesn't hook the
+    viewer, so where the clip *begins* matters more than the average
+    loudness of the whole window.
+    """
     y, sr = librosa.load(str(wav_path), sr=None)
     duration = librosa.get_duration(y=y, sr=sr)
     if duration <= clip_seconds:
         return 0.0
+
     rms = librosa.feature.rms(y=y, frame_length=sr, hop_length=sr)[0]
     margin = max(1, int(duration * 0.05))
+
+    # Candidate onsets: moments of strong new energy (vocal/instrument entry).
+    onset_frames = librosa.onset.onset_detect(
+        y=y, sr=sr, units="time", backtrack=True,
+    )
+    onset_times = [t for t in onset_frames if margin <= t <= duration - clip_seconds - margin]
+
+    def window_score(start: float) -> float:
+        start_i = int(start)
+        return float(np.mean(rms[start_i:start_i + clip_seconds]))
+
+    if onset_times:
+        # Among onsets, prefer the one whose following window is loudest,
+        # so the clip both opens on a hook and stays energetic.
+        best_start = max(onset_times, key=window_score)
+        return float(best_start)
+
+    # Fallback: no clean onsets detected, use the loudest window as before.
     best_start, best_score = margin, -1
     for start in range(margin, max(margin + 1, int(duration) - clip_seconds - margin)):
-        score = np.mean(rms[start:start + clip_seconds])
+        score = window_score(start)
         if score > best_score:
             best_score, best_start = score, start
     return float(best_start)
@@ -292,8 +317,11 @@ def generate_metadata(source_id: str, source_title: str, transcript: str) -> tup
         f'  "title" - YouTube Shorts title, under 100 characters, format: '
         f'Song Name - Singer | Bhojpuri Folk Song #Shorts\n'
         f'  "description" - 3-5 lines including song name, one evocative line, the full video link '
-        f'(https://www.youtube.com/watch?v={source_id}), #Bhojpuri, and a region hashtag '
-        f'(#Bihar, #UP, or #Purvanchal)\n'
+        f'(https://www.youtube.com/watch?v={source_id}), then a final line with 8-10 hashtags '
+        f'for maximum discovery: always include #Shorts, #Bhojpuri, #Lokgeet, and #BhojpuriSong, '
+        f'plus a region hashtag (#Bihar, #UP, or #Purvanchal), plus 3-4 more specific hashtags drawn '
+        f'from the song itself (singer name, occasion/festival if mentioned e.g. #Vivah #Bhakti #Shaadi, '
+        f'or genre like #FolkMusic #DesiMusic)\n'
         f'  "tags" - JSON array of 15-20 strings mixing broad terms (bhojpuri, folk song, lokgeet, '
         f'indian folk music), regional terms (bihar, up bhojpuri, purvanchal), and specific terms '
         f'(song name, singer, occasion)\n\n'
@@ -318,7 +346,9 @@ def build_fallback_prompt(source_id: str, source_title: str, transcript: str) ->
         f'"{source_title}" (full video: https://www.youtube.com/watch?v={source_id}).\n\n'
         f'Transcript of the clip (Hindi/Bhojpuri, may contain errors):\n"{transcript.strip()}"\n\n'
         f'Please give me a TITLE (under 100 chars, format: Song Name - Singer | Bhojpuri Folk Song #Shorts), '
-        f'a DESCRIPTION (3-5 lines with song name, an evocative line, the video link, and hashtags), '
+        f'a DESCRIPTION (3-5 lines with song name, an evocative line, the video link, then a final '
+        f'line of 8-10 hashtags - always #Shorts #Bhojpuri #Lokgeet #BhojpuriSong, a region hashtag '
+        f'like #Bihar/#UP/#Purvanchal, and 3-4 more specific ones from the singer, occasion, or genre), '
         f'and 15-20 comma-separated TAGS mixing broad and specific terms.'
     )
 
