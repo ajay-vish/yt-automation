@@ -207,12 +207,14 @@ def _escape_drawtext(text: str) -> str:
 def cut_and_reframe(video_path: Path, start: float, clip_seconds: int, out_path: Path, title: str = ""):
     display_title = title.split("|")[0].strip() if title else ""
 
+    fg_width = SHORT_WIDTH
+    fg_height = SHORT_WIDTH  # 1:1 square, centered in the vertical canvas
     base_vf = (
         f"[0:v]trim=start={start}:duration={clip_seconds},setpts=PTS-STARTPTS,"
         f"scale={SHORT_WIDTH}:{SHORT_HEIGHT}:force_original_aspect_ratio=increase,crop={SHORT_WIDTH}:{SHORT_HEIGHT},"
         f"boxblur=20:5[bg];"
         f"[0:v]trim=start={start}:duration={clip_seconds},setpts=PTS-STARTPTS,"
-        f"scale={SHORT_WIDTH}:-2[fg];"
+        f"scale={fg_width}:{fg_height}:force_original_aspect_ratio=increase,crop={fg_width}:{fg_height}[fg];"
         f"[bg][fg]overlay=(W-w)/2:(H-h)/2[base]"
     )
 
