@@ -26,7 +26,8 @@
     "RKvje0VG9fo",
     "7xVc7Ff5oBA",
     "UHIuX3ZvE3E",
-    "ZllUbv2XyK8"
+    "ZllUbv2XyK8",
+    "aSSksvRKJLg"
   ],
   "scheduled_slots": [
     "2026-07-08T13:30:00Z",
@@ -40,7 +41,8 @@
     "2026-07-11T07:30:00Z",
     "2026-07-11T13:30:00Z",
     "2026-07-11T15:30:00Z",
-    "2026-07-12T07:30:00Z"
+    "2026-07-12T07:30:00Z",
+    "2026-07-12T13:30:00Z"
   ],
   "pending_comments": {
     "A7FLcO5hdgU": {
@@ -106,6 +108,10 @@
     "h0D_ODoLs1s": {
       "source_id": "ZllUbv2XyK8",
       "title": "Bhojpuri Devi Geet | \u092e\u094b\u0930\u0935\u093e \u0928\u093e\u091a\u0947 \u092e\u094b\u0930\u093f\u0928\u093f\u092f\u093e \u0915\u094b\u092f\u093f\u0932\u093f\u092f\u093e \u0917\u093e\u0935\u0947 | Navratri Special 2025"
+    },
+    "F58WvzTqGZs": {
+      "source_id": "aSSksvRKJLg",
+      "title": "\u092d\u094b\u0932\u0947 \u092c\u093e\u092c\u093e \u092a\u0930 \u0928\u092f\u093e \u0935\u093e\u092f\u0930\u0932 \u0917\u0940\u0924 | \u0915\u094c\u0928 \u0917\u091c\u0947\u0921\u093f\u092f\u093e \u0917\u093e\u091c\u0935\u093e \u0926\u093f\u0939\u093e\u0932\u0938 \u0930\u0947 | Latest Shiv Ji Bhajan 2025"
     }
   },
   "commented_video_ids": []
