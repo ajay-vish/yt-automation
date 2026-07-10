@@ -15,12 +15,12 @@ SHORT_WIDTH, SHORT_HEIGHT = 1080, 1920
 # --- UPDATED STYLING FOR CONCEPT 1 ---
 TITLE_FONT_FILE = WORK_DIR / "Mukta-Bold.ttf"
 TITLE_FONT_SIZE = 60
-TITLE_COLOR = "#FFFFFF"         # Clean white modern text
-TITLE_OUTLINE_COLOR = "#000000"
+TITLE_COLOR = "white"         # Clean white modern text
+TITLE_OUTLINE_COLOR = "black"
 TITLE_OUTLINE_WIDTH = 2         # Thinner outline for elegance
 TITLE_SHADOW_COLOR = "black@0.6"
 TITLE_SHADOW_X = TITLE_SHADOW_Y = 5
-TITLE_Y_START = 320
+TITLE_Y_START = 230
 TITLE_MAX_LINES = 2
 TITLE_SIDE_MARGIN = 60
 TITLE_LINE_SPACING = 35
@@ -28,7 +28,13 @@ TITLE_LINE_SPACING = 35
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 GIF_PATH = _REPO_ROOT / "assets" / "Subscribe.gif"
 BRANDING_PATH = _REPO_ROOT / "assets" / "Branding.png"
+CALLOUT_PATH = _REPO_ROOT / "assets" / "callout.png"
 GIF_START, GIF_END = 5, 9
+
+# Callout overlay settings
+CALLOUT_WIDTH = 450
+CALLOUT_Y = 60
+CALLOUT_CORNER_RADIUS = 10
 
 IST = ZoneInfo("Asia/Kolkata")
 SLOT_TIMES_IST = [(13, 0), (19, 0), (21, 0)]
@@ -197,17 +203,17 @@ def _escape_drawtext(text: str) -> str:
 
 
 def cut_and_reframe(video_path: Path, start: float, clip_seconds: int, out_path: Path, title: str = ""):
-    display_title = title.split("|")[0].strip() if title else ""
+    display_title = title.split("#")[0].strip() if title else ""
 
-    fg_width = SHORT_WIDTH
-    fg_height = SHORT_WIDTH  # 1:1 square
+    fg_width = SHORT_WIDTH - 25
+    fg_height = SHORT_WIDTH - 25  # 1:1 square
     radius = 30  # Rounded corner radius
 
-    # 1. Background: Blurred + 40% Black overlay (Frosted Glass)
+    # 1. Background: Blurred + 5% Black overlay (Frosted Glass)
     bg_vf = (
         f"[0:v]trim=start={start}:duration={clip_seconds},setpts=PTS-STARTPTS,"
         f"scale={SHORT_WIDTH}:{SHORT_HEIGHT}:force_original_aspect_ratio=increase,crop={SHORT_WIDTH}:{SHORT_HEIGHT},"
-        f"boxblur=20:5,drawbox=x=0:y=0:w=iw:h=ih:color=black@0.4:t=fill[bg_dark]"
+        f"boxblur=20:5,drawbox=x=0:y=0:w=iw:h=ih:color=black@0.05:t=fill[bg_dark]"
     )
 
     # 2. Foreground: Square cropped center video with rounded corners via Alpha Mask
@@ -220,12 +226,9 @@ def cut_and_reframe(video_path: Path, start: float, clip_seconds: int, out_path:
         f"if(lte(hypot({radius}-(W/2-abs(W/2-X)),{radius}-(H/2-abs(H/2-Y))),{radius}),255,0),255)'[fg_round]"
     )
 
-    # 3. Drop Shadow: Duplicate FG, turn black, blur, and overlay below the FG
+    # 3. No Drop Shadow: Overlay FG directly onto bg_dark
     shadow_vf = (
-        f"[fg_round]split[shadow_in][fg_final];"
-        f"[shadow_in]colorchannelmixer=rr=0:gg=0:bb=0:aa=0.6,boxblur=15:5[shadow];"
-        f"[bg_dark][shadow]overlay=(W-w)/2+10:(H-h)/2+15[bg_shadow];"
-        f"[bg_shadow][fg_final]overlay=(W-w)/2:(H-h)/2[base]"
+        f"[bg_dark][fg_round]overlay=(W-w)/2:(H-h)/2[base]"
     )
 
     base_vf = f"{bg_vf};{fg_vf};{shadow_vf}"
@@ -233,6 +236,7 @@ def cut_and_reframe(video_path: Path, start: float, clip_seconds: int, out_path:
     title_vf_parts = []
     last_label = "base"
     if display_title:
+        safe_font_path = str(TITLE_FONT_FILE.resolve()).replace('\\', '/').replace(':', '\\:')
         lines = _wrap_title(display_title)
         line_height = TITLE_FONT_SIZE + TITLE_LINE_SPACING
         prev_label = "base"
@@ -241,7 +245,7 @@ def cut_and_reframe(video_path: Path, start: float, clip_seconds: int, out_path:
             y_expr = f"{TITLE_Y_START}+{i * line_height}" if i else str(TITLE_Y_START)
             title_vf_parts.append(
                 f"[{prev_label}]drawtext=text='{_escape_drawtext(line)}':"
-                f"fontfile='{TITLE_FONT_FILE}':fontsize={TITLE_FONT_SIZE}:fontcolor={TITLE_COLOR}:"
+                f"fontfile='{safe_font_path}':fontsize={TITLE_FONT_SIZE}:fontcolor={TITLE_COLOR}:"
                 f"borderw={TITLE_OUTLINE_WIDTH}:bordercolor={TITLE_OUTLINE_COLOR}:"
                 f"shadowx={TITLE_SHADOW_X}:shadowy={TITLE_SHADOW_Y}:shadowcolor={TITLE_SHADOW_COLOR}:"
                 f"x=(w-text_w)/2:y={y_expr}[{out_label}]"
@@ -251,28 +255,32 @@ def cut_and_reframe(video_path: Path, start: float, clip_seconds: int, out_path:
     title_vf = ";".join(title_vf_parts)
 
     scale_vf = (
-        f"[1:v]scale=350:-1[gif_scaled];"
-        f"[2:v]scale=546:-1,format=yuva420p,"
+        f"[1:v]scale=350:-2[gif_scaled];"
+        f"[2:v]scale=546:-2,format=yuva420p,"
         f"geq=lum='p(X,Y)':cb='p(X,Y)':cr='p(X,Y)':a='if(gt(abs(W/2-X),W/2-(H*0.1))*gt(abs(H/2-Y),H/2-(H*0.1)),"
-        f"if(lte(hypot((H*0.1)-(W/2-abs(W/2-X)),(H*0.1)-(H/2-abs(H/2-Y))),(H*0.1)),p(X,Y),0),p(X,Y))'[brand_scaled]"
+        f"if(lte(hypot((H*0.1)-(W/2-abs(W/2-X)),(H*0.1)-(H/2-abs(H/2-Y))),(H*0.1)),p(X,Y),0),p(X,Y))'[brand_scaled];"
+        f"[3:v]scale={CALLOUT_WIDTH}:-2,format=yuva420p,"
+        f"geq=lum='p(X,Y)':cb='p(X,Y)':cr='p(X,Y)':a='if(gt(abs(W/2-X),W/2-{CALLOUT_CORNER_RADIUS})*gt(abs(H/2-Y),H/2-{CALLOUT_CORNER_RADIUS}),"
+        f"if(lte(hypot({CALLOUT_CORNER_RADIUS}-(W/2-abs(W/2-X)),{CALLOUT_CORNER_RADIUS}-(H/2-abs(H/2-Y))),{CALLOUT_CORNER_RADIUS}),p(X,Y),0),p(X,Y))'[callout_scaled]"
     )
-    brand_vf = f"[{last_label}][brand_scaled]overlay=x=(W-w)/2:y=H-h-120:eof_action=repeat[branded]"
+    callout_vf = f"[{last_label}][callout_scaled]overlay=x=(W-w)/2:y={CALLOUT_Y}:eof_action=repeat[with_callout]"
+    brand_vf = f"[with_callout][brand_scaled]overlay=x=(W-w)/2:y=H-h-120:eof_action=repeat[branded]"
     gif_vf = (
         f"[gif_scaled]setpts=PTS-STARTPTS+{GIF_START}/TB[gif_timed];"
-        f"[branded][gif_timed]overlay=x=(W-w)/2:y=H-h-260:"
+        f"[branded][gif_timed]overlay=x=(W-w)/2:y=H-h-100:"
         f"enable='between(t,{GIF_START},{GIF_END})':eof_action=pass[vout]"
     )
 
     filter_parts = [base_vf]
     if title_vf:
         filter_parts.append(title_vf)
-    filter_parts += [scale_vf, brand_vf, gif_vf]
+    filter_parts += [scale_vf, callout_vf, brand_vf, gif_vf]
     filter_complex = ";".join(filter_parts)
     filter_complex += f";[0:a]atrim=start={start}:duration={clip_seconds},asetpts=PTS-STARTPTS[aout]"
 
     run([
         "ffmpeg", "-y", "-i", str(video_path), "-ignore_loop", "0",
-        "-i", str(GIF_PATH), "-i", str(BRANDING_PATH),
+        "-i", str(GIF_PATH), "-i", str(BRANDING_PATH), "-i", str(CALLOUT_PATH),
         "-filter_complex", filter_complex,
         "-map", "[vout]", "-map", "[aout]",
         "-c:v", "libx264", "-c:a", "aac", "-shortest", str(out_path),
@@ -305,7 +313,7 @@ def transcribe_to_srt(clip_video_path: Path, srt_path: Path) -> str:
 def burn_captions(clip_video_path: Path, srt_path: Path, out_path: Path):
     style = (
         "FontName=Noto Sans Devanagari,FontSize=8,PrimaryColour=&HFFFFFF&,"
-        "OutlineColour=&H000000&,BorderStyle=1,Outline=1.2,Alignment=2,MarginV=80"
+        "OutlineColour=&H000000&,BorderStyle=1,Outline=1.2,Alignment=2,MarginV=50"
     )
     safe_srt_path = str(srt_path.resolve()).replace('\\', '/').replace(':', '\\:')
     run(["ffmpeg", "-y", "-i", str(clip_video_path),
