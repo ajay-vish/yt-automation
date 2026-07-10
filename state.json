@@ -49,10 +49,10 @@
     "XssqiZy4QBs",
     "czms2Of0IU8",
     "QGR1uF5grqU",
-    "yp0IPSVpu4w"
+    "yp0IPSVpu4w",
+    "f81Kg_I9EvY"
   ],
   "scheduled_slots": [
-    "2026-07-10T13:30:00Z",
     "2026-07-10T15:30:00Z",
     "2026-07-11T07:30:00Z",
     "2026-07-11T13:30:00Z",
@@ -80,7 +80,8 @@
     "2026-07-18T15:30:00Z",
     "2026-07-19T07:30:00Z",
     "2026-07-19T13:30:00Z",
-    "2026-07-19T15:30:00Z"
+    "2026-07-19T15:30:00Z",
+    "2026-07-20T07:30:00Z"
   ],
   "pending_comments": {
     "gsSIIR9k-pY": {
@@ -202,6 +203,10 @@
     "Ey2wZfcmUac": {
       "source_id": "yp0IPSVpu4w",
       "title": "Pidiya ka zhoomer geet | New Pidiya Geet | Manju Lokgeet"
+    },
+    "OS4QaUiw7SU": {
+      "source_id": "f81Kg_I9EvY",
+      "title": "Pidiya Ka Geet - A Heartfelt Tribute to Childhood Memories | Manju Lokgeet"
     }
   },
   "commented_video_ids": [
