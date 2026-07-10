@@ -81,45 +81,9 @@
     "2026-07-19T13:30:00Z"
   ],
   "pending_comments": {
-    "A7FLcO5hdgU": {
-      "source_id": "Fx-mY1zsK7o",
-      "title": "\u0917\u0902\u0917\u093e \u0915\u0947 \u0932\u0939\u0930\u093f\u092f\u093e \u090f\u0915 \u0906\u0908 \u0917\u0907\u0932\u0940 | \u0926\u0947\u0935\u0940 \u092d\u091c\u0928 | Devi Maa Bhakti Geet | Maa Durga Songs 2025"
-    },
-    "Q364VfzOWGM": {
-      "source_id": "kdWHlVDx2G4",
-      "title": "Bhojpuri naach geet | \u092d\u094b\u091c\u092a\u0941\u0930\u0940 \u0928\u093e\u091a \u0917\u0940\u0924 | New song 2024 | Manju Lokgeet"
-    },
-    "kAdQhvJstuw": {
-      "source_id": "F-Pu2MA3QJ4",
-      "title": "Ganesh Ji Bhojpuri 2025 Lokgeet: \u0939\u092e\u0930\u0947 \u092d\u091c\u0928\u093f\u092f\u093e \u092e\u0947\u0902 \u0906\u091c\u093e \u090f \u0917\u0923\u0947\u0936 \u092c\u093e\u092c\u093e | Ganesh Chaturthi Bhajan"
-    },
-    "x3p_-Ha5VyU": {
-      "source_id": "AjQUEB7juy4",
-      "title": "\u091b\u0920\u0940 \u092e\u0908\u092f\u093e \u0921\u094b\u0932\u0940 \u091a\u0922\u093c \u0905\u0907\u0932\u0940 \u0932\u093e\u0932 \u092a\u093f\u092f\u0930 \u0913\u0922\u093c\u093e\u0908 | Chatt mata ji ka geet | Manju Lokgeet #chatt #\u091b\u0920"
-    },
     "gsSIIR9k-pY": {
       "source_id": "9TZUthFnuDg",
       "title": "Sohar Geet 2025 | Kaha Bole Papi Papihara | Bhojpuri Lokgeet | Traditional Folk Song"
-    },
-    "uJqhGmZmKVg": {
-      "source_id": "aEJuqrdU31g",
-      "title": "Mandir Mein Sute Hanuman Ji | Bhojpuri Hanuman Ji Bhajan | Manju Lokgeet | Hanuman Bhakti Geet"
-    },
-    "vurucwsMt-E": {
-      "source_id": "_NreMLjdrGk",
-      "title": "\u0926\u0941\u0932\u094d\u0939\u093e \u092c\u0948\u0920\u0947 \u0905\u092a\u0928\u0947 \u092a\u093e\u092a\u093e \u0915\u0947 \u0917\u094b\u0926 \u092e\u0947 - \u0926\u094d\u0935\u093e\u0930 \u092a\u0942\u091c\u093e \u0917\u0940\u0924 | Manju Lokgeet"
-    },
-    "6-zwZGkufTo": {
-      "source_id": "BsKC79G4_T8",
-      "title": "\u092e\u091a\u093f\u092f\u093e\u0939\u093f \u092c\u0948\u0920\u0947\u0932\u0940 \u0938\u093e\u0938\u0941 \u092c\u0939\u0941 \u0938\u0947 \u0905\u0930\u091c \u0915\u0930\u0947 | Krishna Ji Sohar Geet | Manju Lokgeet | Bhojpuri Sohar Song"
-    },
-    "L0AW-NBt0Qo": {
-      "source_id": "xaXBDu_3INg",
-      "title": "Sari Samayiya Ae Baba Bihah | UP Vivah Lokgeet 2025 | Manju Vishwakarma"
-    },
-    "qcsFonzdFPA": {
-      "source_id": "DwkDczs-pc8",
-      "title": "\u092d\u094b\u0932\u093e \u0918\u0930 \u0905\u0907\u0939\u0947\u0902! Shiv Charcha 2025: \u092e\u0928\u092e\u094b\u0939\u0915 \u0936\u093f\u0935 \u092d\u091c\u0928 | Rahiyame Fulwa Bichaibe Ho #shivcharcha #folksong"
     },
     "Sg8A-5QSYmg": {
       "source_id": "c7cfkDzj2ZI",
@@ -234,5 +198,15 @@
       "title": "\u091b\u0920 \u092a\u0942\u091c\u093e \u0915\u093e \u092c\u0939\u0941\u0924 \u0938\u0941\u0928\u094d\u0926\u0930 \u0917\u0940\u0924 | Chhath ghaat | Jai Chathi Maiyya | Manju Lokgeet #\u091b\u0920\u092a\u0942\u091c\u093e\u0917\u0940\u09242024"
     }
   },
-  "commented_video_ids": []
+  "commented_video_ids": [
+    "A7FLcO5hdgU",
+    "Q364VfzOWGM",
+    "kAdQhvJstuw",
+    "x3p_-Ha5VyU",
+    "uJqhGmZmKVg",
+    "vurucwsMt-E",
+    "6-zwZGkufTo",
+    "L0AW-NBt0Qo",
+    "qcsFonzdFPA"
+  ]
 }
