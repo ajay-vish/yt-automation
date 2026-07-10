@@ -12,13 +12,14 @@ WORK_DIR = Path("work")
 CLIP_SECONDS_RANGE = (15, 22)
 SHORT_WIDTH, SHORT_HEIGHT = 1080, 1920
 
-TITLE_FONT_FILE = WORK_DIR / "Poppins-Bold.ttf"
+# --- UPDATED STYLING FOR CONCEPT 1 ---
+TITLE_FONT_FILE = WORK_DIR / "Mukta-Bold.ttf"
 TITLE_FONT_SIZE = 60
-TITLE_COLOR = "#FFD700"
-TITLE_OUTLINE_COLOR = "#2C1A0B"
-TITLE_OUTLINE_WIDTH = 5
-TITLE_SHADOW_COLOR = "black@0.8"
-TITLE_SHADOW_X = TITLE_SHADOW_Y = 6
+TITLE_COLOR = "#FFFFFF"         # Clean white modern text
+TITLE_OUTLINE_COLOR = "#000000"
+TITLE_OUTLINE_WIDTH = 2         # Thinner outline for elegance
+TITLE_SHADOW_COLOR = "black@0.6"
+TITLE_SHADOW_X = TITLE_SHADOW_Y = 5
 TITLE_Y_START = 320
 TITLE_MAX_LINES = 2
 TITLE_SIDE_MARGIN = 60
@@ -141,12 +142,6 @@ def extract_audio(video_path: Path, wav_path: Path):
 
 
 def find_best_window(wav_path: Path, clip_seconds: int) -> float:
-    """Pick a clip window that is loud overall AND opens right on a strong
-    onset (a beat/vocal entrance), instead of starting mid-note. Shorts get
-    swiped away in under a second if the first frame doesn't hook the
-    viewer, so where the clip *begins* matters more than the average
-    loudness of the whole window.
-    """
     y, sr = librosa.load(str(wav_path), sr=None)
     duration = librosa.get_duration(y=y, sr=sr)
     if duration <= clip_seconds:
@@ -155,7 +150,6 @@ def find_best_window(wav_path: Path, clip_seconds: int) -> float:
     rms = librosa.feature.rms(y=y, frame_length=sr, hop_length=sr)[0]
     margin = max(1, int(duration * 0.05))
 
-    # Candidate onsets: moments of strong new energy (vocal/instrument entry).
     onset_frames = librosa.onset.onset_detect(
         y=y, sr=sr, units="time", backtrack=True,
     )
@@ -166,12 +160,9 @@ def find_best_window(wav_path: Path, clip_seconds: int) -> float:
         return float(np.mean(rms[start_i:start_i + clip_seconds]))
 
     if onset_times:
-        # Among onsets, prefer the one whose following window is loudest,
-        # so the clip both opens on a hook and stays energetic.
         best_start = max(onset_times, key=window_score)
         return float(best_start)
 
-    # Fallback: no clean onsets detected, use the loudest window as before.
     best_start, best_score = margin, -1
     for start in range(margin, max(margin + 1, int(duration) - clip_seconds - margin)):
         score = window_score(start)
@@ -181,7 +172,8 @@ def find_best_window(wav_path: Path, clip_seconds: int) -> float:
 
 
 def download_font(dest_path: Path):
-    url = "https://github.com/google/fonts/raw/main/ofl/poppins/Poppins-Bold.ttf"
+    # Swapped to Mukta: beautiful sans-serif that supports both Hindi (Devanagari) & English
+    url = "https://github.com/google/fonts/raw/main/ofl/mukta/Mukta-Bold.ttf"
     req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
     with urllib.request.urlopen(req) as response, open(dest_path, "wb") as f:
         f.write(response.read())
@@ -208,15 +200,35 @@ def cut_and_reframe(video_path: Path, start: float, clip_seconds: int, out_path:
     display_title = title.split("|")[0].strip() if title else ""
 
     fg_width = SHORT_WIDTH
-    fg_height = SHORT_WIDTH  # 1:1 square, centered in the vertical canvas
-    base_vf = (
+    fg_height = SHORT_WIDTH  # 1:1 square
+    radius = 30  # Rounded corner radius
+
+    # 1. Background: Blurred + 40% Black overlay (Frosted Glass)
+    bg_vf = (
         f"[0:v]trim=start={start}:duration={clip_seconds},setpts=PTS-STARTPTS,"
         f"scale={SHORT_WIDTH}:{SHORT_HEIGHT}:force_original_aspect_ratio=increase,crop={SHORT_WIDTH}:{SHORT_HEIGHT},"
-        f"boxblur=20:5[bg];"
-        f"[0:v]trim=start={start}:duration={clip_seconds},setpts=PTS-STARTPTS,"
-        f"scale={fg_width}:{fg_height}:force_original_aspect_ratio=increase,crop={fg_width}:{fg_height}[fg];"
-        f"[bg][fg]overlay=(W-w)/2:(H-h)/2[base]"
+        f"boxblur=20:5,drawbox=x=0:y=0:w=iw:h=ih:color=black@0.4:t=fill[bg_dark]"
     )
+
+    # 2. Foreground: Square cropped center video with rounded corners via Alpha Mask
+    fg_vf = (
+        f"[0:v]trim=start={start}:duration={clip_seconds},setpts=PTS-STARTPTS,"
+        f"scale={fg_width}:{fg_height}:force_original_aspect_ratio=increase,crop={fg_width}:{fg_height},"
+        f"format=yuva420p,"
+        f"geq=lum='p(X,Y)':cb='p(X,Y)':cr='p(X,Y)':"
+        f"a='if(gt(abs(W/2-X),W/2-{radius})*gt(abs(H/2-Y),H/2-{radius}),"
+        f"if(lte(hypot({radius}-(W/2-abs(W/2-X)),{radius}-(H/2-abs(H/2-Y))),{radius}),255,0),255)'[fg_round]"
+    )
+
+    # 3. Drop Shadow: Duplicate FG, turn black, blur, and overlay below the FG
+    shadow_vf = (
+        f"[fg_round]split[shadow_in][fg_final];"
+        f"[shadow_in]colorchannelmixer=rr=0:gg=0:bb=0:aa=0.6,boxblur=15:5[shadow];"
+        f"[bg_dark][shadow]overlay=(W-w)/2+10:(H-h)/2+15[bg_shadow];"
+        f"[bg_shadow][fg_final]overlay=(W-w)/2:(H-h)/2[base]"
+    )
+
+    base_vf = f"{bg_vf};{fg_vf};{shadow_vf}"
 
     title_vf_parts = []
     last_label = "base"
