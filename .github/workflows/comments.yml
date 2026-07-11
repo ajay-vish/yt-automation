@@ -2,9 +2,9 @@ name: Post Shorts Comments
 
 on:
   schedule:
-    - cron: "10 2 * * *"   # ~10 min after 7:30 AM IST slot
-    - cron: "40 7 * * *"   # ~10 min after 1:00 PM IST slot
-    - cron: "40 13 * * *"  # ~10 min after 7:00 PM IST slot
+    - cron: "35 7 * * *"   # 7:35 AM UTC -> 1:05 PM IST (5 min after 1:00 PM slot)
+    - cron: "5 14 * * *"   # 2:05 PM UTC -> 7:35 PM IST (5 min after 7:30 PM slot)
+    - cron: "35 15 * * *"  # 3:35 PM UTC -> 9:05 PM IST (5 min after 9:00 PM slot)
   workflow_dispatch: {}
 
 permissions:
