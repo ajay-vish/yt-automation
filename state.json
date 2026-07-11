@@ -62,10 +62,10 @@
     "E39qc8ImXC0",
     "bBFv7lrAE0w",
     "avpISxYnaYQ",
-    "MMozYW545gQ"
+    "MMozYW545gQ",
+    "hOm3FtriM_c"
   ],
   "scheduled_slots": [
-    "2026-07-11T13:30:00Z",
     "2026-07-11T15:30:00Z",
     "2026-07-12T07:30:00Z",
     "2026-07-12T13:30:00Z",
@@ -102,7 +102,8 @@
     "2026-07-22T15:30:00Z",
     "2026-07-23T07:30:00Z",
     "2026-07-23T13:30:00Z",
-    "2026-07-23T15:30:00Z"
+    "2026-07-23T15:30:00Z",
+    "2026-07-24T07:30:00Z"
   ],
   "pending_comments": {
     "gsSIIR9k-pY": {
@@ -268,6 +269,10 @@
     "5BAsMSz2QOQ": {
       "source_id": "MMozYW545gQ",
       "title": "Pidiya Ka Nakata Geet 2025 | \u092e\u091c\u0947\u0926\u093e\u0930 \u0926\u0947\u0939\u093e\u0924\u0940 \u0917\u0940\u0924 | Manju Lokgeet"
+    },
+    "ktxDfFTc9Yg": {
+      "source_id": "hOm3FtriM_c",
+      "title": "\u092a\u0939\u093f\u0932\u0947 \u092a\u0939\u093f\u0932\u0947 \u0939\u092e \u0915\u0930\u0928\u0940 \u091b\u0920\u0940 \u092e\u0948\u092f\u093e \u092c\u0930\u0924 \u0924\u0939\u093e\u0930 | Chatt geet | Ganga ghat | Bhakti geet | Manju lokgeet"
     }
   },
   "commented_video_ids": [
