@@ -58,10 +58,10 @@
     "74rxa5Ty1Ns",
     "tJN4q5msMo8",
     "tPvd_0WwYHs",
-    "NLWENJmnJSE"
+    "NLWENJmnJSE",
+    "E39qc8ImXC0"
   ],
   "scheduled_slots": [
-    "2026-07-11T07:30:00Z",
     "2026-07-11T13:30:00Z",
     "2026-07-11T15:30:00Z",
     "2026-07-12T07:30:00Z",
@@ -95,7 +95,8 @@
     "2026-07-21T13:30:00Z",
     "2026-07-21T15:30:00Z",
     "2026-07-22T07:30:00Z",
-    "2026-07-22T13:30:00Z"
+    "2026-07-22T13:30:00Z",
+    "2026-07-22T15:30:00Z"
   ],
   "pending_comments": {
     "gsSIIR9k-pY": {
@@ -245,6 +246,10 @@
     "a3cb5CLiPME": {
       "source_id": "NLWENJmnJSE",
       "title": "\u0938\u094b\u0939\u0930 \u0917\u0940\u0924 | \u0938\u0947\u0928\u0941\u0930\u093e \u0932\u0917\u0948\u092c\u094b, \u0915\u0939\u093e\u0930\u093e \u0932\u0917\u0948\u092c\u094b  | Bhojpuri Sohar 2025 | Manju Lokgeet"
+    },
+    "paejXIpwd3w": {
+      "source_id": "E39qc8ImXC0",
+      "title": "\u0906\u0902\u0917\u0928 \u092e\u0947\u0902 \u092a\u0942\u091c\u0928 \u0939\u094b\u0932\u093e \u0917\u094c\u0930\u0940 \u0917\u0923\u0947\u0936 \u0915\u0947 | New Desi Ganesh Bhajan 2026 | Manju Vishwakarma"
     }
   },
   "commented_video_ids": [
