@@ -76,10 +76,10 @@
     "0ZFy4td2Nfk",
     "qPl_j6wlbKo",
     "H-9phwRZiVE",
-    "4nJdY_b0y4M"
+    "4nJdY_b0y4M",
+    "K6EuvxbrX0M"
   ],
   "scheduled_slots": [
-    "2026-07-12T07:30:00Z",
     "2026-07-12T13:30:00Z",
     "2026-07-12T15:30:00Z",
     "2026-07-13T07:30:00Z",
@@ -128,7 +128,8 @@
     "2026-07-27T13:30:00Z",
     "2026-07-27T15:30:00Z",
     "2026-07-28T07:30:00Z",
-    "2026-07-28T13:30:00Z"
+    "2026-07-28T13:30:00Z",
+    "2026-07-28T15:30:00Z"
   ],
   "pending_comments": {
     "gsSIIR9k-pY": {
@@ -338,6 +339,10 @@
     "6q5HngbLp8c": {
       "source_id": "4nJdY_b0y4M",
       "title": "\u0939\u092e\u093e\u0930 \u0936\u092e\u094d\u092d\u0942 \u092e\u0939\u093e\u0926\u0947\u0935 | Mahakal corridor | Mahakaleshwar | Ujjain | Manju Lokgeet #ujjain"
+    },
+    "DgPFM6L-YeY": {
+      "source_id": "K6EuvxbrX0M",
+      "title": "\u092a\u0941\u0930\u0941\u092c \u091c\u0907\u0939\u093e \u092f\u093e \u092a\u0936\u094d\u091a\u093f\u092e \u092d\u0932\u0947 \u0930\u093e\u091c\u093e \u0926\u0930\u093f\u092f\u093e\u0907\u092f\u093e \u0932\u0947 \u0905\u0907\u0939\u093f\u092f\u093e \u092d\u0932\u0947 \u0930\u093e\u091c\u093e | Vivah jhumar geet | Manju Lokgeet"
     }
   },
   "commented_video_ids": [
