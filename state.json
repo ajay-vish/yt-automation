@@ -86,7 +86,8 @@
     "9qQ4cmb5F4Q",
     "wbEc8r4RHSQ",
     "GHwLnj4X-n0",
-    "LcPssAteqvE"
+    "LcPssAteqvE",
+    "sMozjA8mQOs"
   ],
   "scheduled_slots": [
     "2026-07-13T07:30:00Z",
@@ -145,7 +146,8 @@
     "2026-07-30T15:30:00Z",
     "2026-07-31T07:30:00Z",
     "2026-07-31T13:30:00Z",
-    "2026-07-31T15:30:00Z"
+    "2026-07-31T15:30:00Z",
+    "2026-08-01T07:30:00Z"
   ],
   "pending_comments": {
     "gsSIIR9k-pY": {
@@ -383,6 +385,10 @@
     "tlcfbjZveyE": {
       "source_id": "LcPssAteqvE",
       "title": "Bhojpuri Devi Geet | \u0939\u092e\u093e\u0930\u0940 \u0905\u092e\u094d\u092c\u0947 \u092e\u0948\u092f\u093e \u0910\u0938\u0940 \u0938\u091c\u0940 | Navratri Bhakti 2025"
+    },
+    "HH0BDtGSwVM": {
+      "source_id": "sMozjA8mQOs",
+      "title": "\u0936\u093f\u0935 \u0917\u0941\u0930\u0941 \u092d\u0947\u091c\u0932\u0947 \u092c\u093e\u0928\u0947 \u0921\u094b\u0932\u093f\u092f\u093e \u0939\u094b | Superhit Bhojpuri Bhajan | Shiv Bhajan 2025"
     }
   },
   "commented_video_ids": [
