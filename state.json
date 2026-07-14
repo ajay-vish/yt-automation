@@ -103,10 +103,10 @@
     "dlZF-lj0nZA",
     "J8dnL9DvO_E",
     "PmAdoQc-JUY",
-    "3OS3_vH6h8o"
+    "3OS3_vH6h8o",
+    "UCwo3p26FR8"
   ],
   "scheduled_slots": [
-    "2026-07-14T07:30:00Z",
     "2026-07-14T13:30:00Z",
     "2026-07-14T15:30:00Z",
     "2026-07-15T07:30:00Z",
@@ -176,7 +176,8 @@
     "2026-08-05T13:30:00Z",
     "2026-08-05T15:30:00Z",
     "2026-08-06T07:30:00Z",
-    "2026-08-06T13:30:00Z"
+    "2026-08-06T13:30:00Z",
+    "2026-08-06T15:30:00Z"
   ],
   "pending_comments": {
     "gsSIIR9k-pY": {
@@ -470,6 +471,10 @@
     "4Mrn6JNF7GM": {
       "source_id": "3OS3_vH6h8o",
       "title": "Vivah zhoomer geet | Bihayeke zhoomer geet | Manju Lokgeet #trending #weddinglokgeet"
+    },
+    "JOpa2FVFNmI": {
+      "source_id": "UCwo3p26FR8",
+      "title": "Pidiya ka zhoomer geet | New Pidiya Geet | Manju Lokgeet"
     }
   },
   "commented_video_ids": [
