@@ -108,10 +108,10 @@
     "528vXTe096Q",
     "hQtorr5_7C0",
     "dvbQ4O8_xQE",
-    "KPcRrmpixxc"
+    "KPcRrmpixxc",
+    "7_g6c-hfyFI"
   ],
   "scheduled_slots": [
-    "2026-07-14T15:30:00Z",
     "2026-07-15T07:30:00Z",
     "2026-07-15T13:30:00Z",
     "2026-07-15T15:30:00Z",
@@ -184,7 +184,8 @@
     "2026-08-07T07:30:00Z",
     "2026-08-07T13:30:00Z",
     "2026-08-07T15:30:00Z",
-    "2026-08-08T07:30:00Z"
+    "2026-08-08T07:30:00Z",
+    "2026-08-08T13:30:00Z"
   ],
   "pending_comments": {
     "gsSIIR9k-pY": {
@@ -486,6 +487,10 @@
     "wqJrn9CUpE8": {
       "source_id": "KPcRrmpixxc",
       "title": "Nakata Zhoomer Bhojpuri Geet | Manju Lokgeet #bhojpuri #lokgeet #manjulakgeetImmerse"
+    },
+    "i6tMqdGJHgM": {
+      "source_id": "7_g6c-hfyFI",
+      "title": "Bajarangi Ho Pura Dehiya Kaila Lal Lal | Manju Lokgeet | Bhojpuri Lokgeet 2025 | New Folk Song"
     }
   },
   "commented_video_ids": [
