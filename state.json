@@ -169,10 +169,10 @@
     "LcrMCoriFos",
     "aG1ogZiXwOI",
     "6vdnkclAMb0",
-    "AnuSelnSlD4"
+    "AnuSelnSlD4",
+    "zwbKdNHq0gY"
   ],
   "scheduled_slots": [
-    "2026-07-18T15:30:00Z",
     "2026-07-19T07:30:00Z",
     "2026-07-19T13:30:00Z",
     "2026-07-19T15:30:00Z",
@@ -765,6 +765,10 @@
     "Z54gKIGvjgw": {
       "source_id": "AnuSelnSlD4",
       "title": "Kumbh Special: Shiv Bhajan in Bhojpuri | Powerful Devotional Song | Manju Lokgeet"
+    },
+    "cZfATf_ESIM": {
+      "source_id": "zwbKdNHq0gY",
+      "title": "\u0915\u0939\u0935\u093e\u092e\u0947 \u0909\u0917\u0928\u0947 \u0938\u0941\u0930\u0941\u091c \u092c\u093e\u092c\u093e, \u0915\u0939\u0935\u093e \u0926\u0947\u0902\u0928 \u0939\u094b \u0905\u091c\u094b\u0930 | Chhatt geet | Bhojpuri Sangeet | Manju Lokgeet"
     }
   },
   "commented_video_ids": [
