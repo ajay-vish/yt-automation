@@ -302,10 +302,10 @@ def transcribe_to_srt(clip_video_path: Path, srt_path: Path) -> str:
     for i, seg in enumerate(segments, start=1):
         lines += [str(i), f"{fmt_ts(seg.start)} --> {fmt_ts(seg.end)}", seg.text.strip(), ""]
         parts.append(seg.text.strip())
-        
+
     if not lines:
         lines = ["1", "00:00:00,000 --> 00:00:01,000", "", ""]
-        
+
     srt_path.write_text("\n".join(lines), encoding="utf-8")
     return " ".join(parts)
 
@@ -331,22 +331,32 @@ def generate_metadata(source_id: str, source_title: str, transcript: str) -> tup
 
     client = genai.Client(api_key=api_key)
     prompt = (
-        f'You are a YouTube channel manager for a Bhojpuri folk songs (lokgeet) channel.\n\n'
+        f'You are an expert YouTube Shorts strategist for a Bhojpuri folk songs (lokgeet) channel, '
+        f'skilled at writing titles that match what currently trends and ranks well in this niche.\n\n'
         f'Source song: "{source_title}"\n'
         f'Full video: https://www.youtube.com/watch?v={source_id}\n\n'
         f'Transcript of the Short clip (Hindi/Bhojpuri, may have errors):\n"{transcript.strip()}"\n\n'
+        f'Before writing, think about how top-performing Bhojpuri/Indian folk music Shorts titles are '
+        f'usually written: they front-load the song or singer name (high search volume terms), use '
+        f'emotional or curiosity-driving phrases (e.g. "dil dhoom", "sabse hit", "bewafa", "viral"), '
+        f'keep it short enough to not get cut off on mobile, and match common search phrasing '
+        f'("bhojpuri new song", "bhojpuri lokgeet 2025", singer name + song name) rather than generic wording.\n\n'
         f'Return a JSON object with exactly these three keys:\n'
-        f'  "title" - YouTube Shorts title, under 100 characters, format: '
-        f'Song Name - Singer | Bhojpuri Folk Song #Shorts\n'
-        f'  "description" - 3-5 lines including song name, one evocative line, the full video link '
-        f'(https://www.youtube.com/watch?v={source_id}), then a final line with 8-10 hashtags '
-        f'for maximum discovery: always include #Shorts, #Bhojpuri, #Lokgeet, and #BhojpuriSong, '
-        f'plus a region hashtag (#Bihar, #UP, or #Purvanchal), plus 3-4 more specific hashtags drawn '
-        f'from the song itself (singer name, occasion/festival if mentioned e.g. #Vivah #Bhakti #Shaadi, '
-        f'or genre like #FolkMusic #DesiMusic)\n'
-        f'  "tags" - JSON array of 15-20 strings mixing broad terms (bhojpuri, folk song, lokgeet, '
-        f'indian folk music), regional terms (bihar, up bhojpuri, purvanchal), and specific terms '
-        f'(song name, singer, occasion)\n\n'
+        f'  "title" - under 100 characters. Lead with the strongest hook (song name, singer, or '
+        f'emotional phrase) in the first few words since that is what shows in search/suggested feeds. '
+        f'Format: Song Name - Singer | Bhojpuri Folk Song #Shorts (adapt wording for higher CTR while '
+        f'keeping it truthful to the clip)\n'
+        f'  "description" - 3-5 lines: song name, one evocative/emotional line that encourages watching '
+        f'the full video, the full video link (https://www.youtube.com/watch?v={source_id}), then a '
+        f'final line with 8-10 hashtags for maximum discovery: always include #Shorts, #Bhojpuri, '
+        f'#Lokgeet, and #BhojpuriSong, plus a region hashtag (#Bihar, #UP, or #Purvanchal), plus 3-4 '
+        f'more specific ones from the song itself (singer name, occasion/festival if mentioned e.g. '
+        f'#Vivah #Bhakti #Shaadi, or genre like #FolkMusic #DesiMusic)\n'
+        f'  "tags" - JSON array of 15-20 strings optimized for YouTube search ranking: mix broad '
+        f'high-volume terms (bhojpuri, bhojpuri song, folk song, lokgeet, indian folk music, bhojpuri '
+        f'new song), regional terms (bihar, up bhojpuri, purvanchal), and specific terms (song name, '
+        f'singer name in full and common misspellings, occasion). Order tags roughly by expected search '
+        f'volume, highest first.\n\n'
         f'Return only valid JSON - no markdown fences, no explanation.'
     )
 
@@ -446,16 +456,23 @@ def main():
     final_path = WORK_DIR / f"{video_id}_final.mp4"
     burn_captions(clip_path, srt_path, final_path)
 
-    publish_at = None
+    # --- Get AI metadata (independent of scheduling) ---
     try:
         ai_title, ai_description, ai_tags = generate_metadata(video_id, title, transcript)
-        publish_at = get_next_available_slot(state)
-        print(f"Scheduled to auto-publish at {publish_at} (UTC)")
     except Exception as exc:
         print(f"WARNING: Gemini failed ({exc}). Falling back to draft.")
         ai_title = f"[DRAFT] {title[:80]}"
         ai_description = build_fallback_prompt(video_id, title, transcript)
         ai_tags = []
+
+    # --- Try to find a publish slot (independent of metadata generation) ---
+    publish_at = None
+    try:
+        publish_at = get_next_available_slot(state)
+        print(f"Scheduled to auto-publish at {publish_at} (UTC)")
+    except Exception as exc:
+        print(f"WARNING: No available slot in next {SLOT_SEARCH_DAYS} days ({exc}). "
+              f"Uploading as private, unscheduled.")
 
     ai_tags = merge_tags(ai_tags)
     uploaded_id = upload_private(final_path, ai_title, ai_description, ai_tags, publish_at=publish_at)
