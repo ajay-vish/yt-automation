@@ -129,10 +129,10 @@
     "H-9phwRZiVE",
     "Y40ykUWDkdw",
     "7xVc7Ff5oBA",
-    "UHIuX3ZvE3E"
+    "UHIuX3ZvE3E",
+    "GYmwRgb0CyE"
   ],
   "scheduled_slots": [
-    "2026-08-10T15:30:00Z",
     "2026-08-11T07:30:00Z",
     "2026-08-11T13:30:00Z",
     "2026-08-11T15:30:00Z",
@@ -1865,6 +1865,10 @@
     "trYB79W-guM": {
       "source_id": "UHIuX3ZvE3E",
       "title": "Tilak geet by Manju Lokgeet"
+    },
+    "IM8zuRl3BqA": {
+      "source_id": "GYmwRgb0CyE",
+      "title": "Ram ji Geet | \u0930\u093e\u092e \u0939\u092e\u0930 \u0935\u0928 \u0915\u0947 \u091a\u093e\u0932\u0928 | Bhojpuri Lokgeet Ram Bhajan"
     }
   },
   "commented_video_ids": [
