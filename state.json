@@ -50,10 +50,10 @@
     "nwYw9e2l2dU",
     "jUiG8jPfZM0",
     "Vluw1E-TErU",
-    "v7yT4NClQms"
+    "v7yT4NClQms",
+    "l-BitwmfnwI"
   ],
   "scheduled_slots": [
-    "2026-08-15T15:30:00Z",
     "2026-08-16T07:30:00Z",
     "2026-08-16T13:30:00Z",
     "2026-08-16T15:30:00Z",
@@ -2194,6 +2194,10 @@
     "-pmP7WLzFg4": {
       "source_id": "v7yT4NClQms",
       "title": "Bhojpuri Devi Geet | \u092c\u0907\u0920\u0932\u0940 \u0939\u094b \u0936\u0940\u0924\u0932\u093e \u092e\u0908\u092f\u093e \u091d\u0930\u0947 \u0932\u0902\u092c\u0940 \u0915\u0947\u0938 | Navratri 2025 Lokgeet"
+    },
+    "ETigWIVJyzc": {
+      "source_id": "l-BitwmfnwI",
+      "title": "Bhojpuri Shiv Bhajan: Dam Dam Damru Bajave Bhole | Navratri 2025"
     }
   },
   "commented_video_ids": [
