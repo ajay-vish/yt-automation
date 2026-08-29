@@ -36,7 +36,10 @@ CALLOUT_WIDTH = 450
 CALLOUT_Y = 60
 CALLOUT_CORNER_RADIUS = 10
 
-IST = ZoneInfo("Asia/Kolkata")
+try:
+    IST = ZoneInfo("Asia/Kolkata")
+except Exception:
+    IST = timezone(timedelta(hours=5, minutes=30))
 SLOT_TIMES_IST = [(13, 0), (19, 0), (21, 0)]
 SLOT_SEARCH_DAYS = 30
 
@@ -396,10 +399,13 @@ def merge_tags(ai_tags: list[str]) -> list[str]:
 
 
 def upload_private(video_path: Path, title: str, description: str, tags: list[str],
-                    publish_at: str | None = None) -> str:
+                    publish_at: str) -> str:
     from google.oauth2.credentials import Credentials
     from googleapiclient.discovery import build
     from googleapiclient.http import MediaFileUpload
+
+    if not publish_at:
+        raise ValueError("publish_at is required; refusing to upload an orphaned private video.")
 
     creds = Credentials(
         None,
@@ -410,9 +416,11 @@ def upload_private(video_path: Path, title: str, description: str, tags: list[st
     )
     youtube = build("youtube", "v3", credentials=creds)
 
-    status = {"privacyStatus": "private", "selfDeclaredMadeForKids": False}
-    if publish_at:
-        status["publishAt"] = publish_at
+    status = {
+        "privacyStatus": "private",
+        "publishAt": publish_at,
+        "selfDeclaredMadeForKids": False,
+    }
 
     body = {
         "snippet": {
@@ -432,6 +440,16 @@ def upload_private(video_path: Path, title: str, description: str, tags: list[st
 
 def main():
     state = load_state()
+
+    # Guard rail: check slot availability before spending time or API quota
+    try:
+        publish_at = get_next_available_slot(state)
+        print(f"[Guard Rail] Target publish slot reserved: {publish_at} (UTC)")
+    except RuntimeError as exc:
+        print(f"[Guard Rail] {exc}")
+        print(f"No available slot in the next {SLOT_SEARCH_DAYS} days. Skipping workflow run entirely.")
+        return 0
+
     video = pick_video(state)
     video_id, title = video["id"], video["title"]
     print(f"Selected video: {title} ({video_id})")
@@ -456,7 +474,7 @@ def main():
     final_path = WORK_DIR / f"{video_id}_final.mp4"
     burn_captions(clip_path, srt_path, final_path)
 
-    # --- Get AI metadata (independent of scheduling) ---
+    # --- Get AI metadata ---
     try:
         ai_title, ai_description, ai_tags = generate_metadata(video_id, title, transcript)
     except Exception as exc:
@@ -465,23 +483,14 @@ def main():
         ai_description = build_fallback_prompt(video_id, title, transcript)
         ai_tags = []
 
-    # --- Try to find a publish slot (independent of metadata generation) ---
-    publish_at = None
-    try:
-        publish_at = get_next_available_slot(state)
-        print(f"Scheduled to auto-publish at {publish_at} (UTC)")
-    except Exception as exc:
-        print(f"WARNING: No available slot in next {SLOT_SEARCH_DAYS} days ({exc}). "
-              f"Uploading as private, unscheduled.")
-
     ai_tags = merge_tags(ai_tags)
     uploaded_id = upload_private(final_path, ai_title, ai_description, ai_tags, publish_at=publish_at)
-    print(f"Uploaded: https://studio.youtube.com/video/{uploaded_id}/edit "
-          f"({'scheduled ' + publish_at if publish_at else 'unscheduled draft'})")
+    print(f"Uploaded: https://studio.youtube.com/video/{uploaded_id}/edit (scheduled {publish_at})")
 
     state["used_video_ids"].append(video_id)
     state["pending_comments"][uploaded_id] = {"source_id": video_id, "title": title}
     save_state(state)
+    return 0
 
 
 if __name__ == "__main__":
