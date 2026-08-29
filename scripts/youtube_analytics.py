@@ -19,12 +19,14 @@ REPORT_PATH = WORK_DIR / "youtube_analysis_report.md"
 
 # Videos newer than this are excluded from "golden day/hour" and other
 # performance rankings, since they haven't had time to accumulate views yet.
-# They're still fetched and shown separately so you can track them.
 MATURITY_THRESHOLD_DAYS = 3
 
 # If uploads on the same day are less than this many minutes apart, flag them
 # as a burst -- YouTube tends to suppress distribution for rapid-fire same-channel uploads.
 BURST_GAP_MINUTES = 45
+
+# How many of a video's top traffic sources to keep in the readable "top_sources" column.
+TOP_N_TRAFFIC_SOURCES = 3
 
 # --- ENV LOADING ---
 def load_env():
@@ -62,12 +64,6 @@ def get_credentials():
         client_id=client_id,
         client_secret=client_secret,
         token_uri="https://oauth2.googleapis.com/token",
-        # NOTE: scopes are baked into the refresh token at consent time, not set here.
-        # If the Analytics API keeps failing (see check_analytics_access below),
-        # the refresh token itself was likely issued without the analytics scope
-        # and needs to be re-generated via a fresh OAuth consent that includes:
-        #   https://www.googleapis.com/auth/yt-analytics.readonly
-        #   https://www.googleapis.com/auth/youtube.readonly
     )
 
 # --- ISO DURATION PARSER ---
@@ -85,16 +81,6 @@ def parse_duration(duration_str):
 
 # --- DIAGNOSTIC: verify Analytics API access BEFORE trusting its data ---
 def check_analytics_access(youtube_analytics, channel_id):
-    """
-    The old script wrapped the whole analytics query in a try/except and
-    silently fell back to all-zero values on ANY failure. That meant every
-    video in the last report had average_view_percentage, shares,
-    subscribers_gained, and estimated_minutes_watched hard-coded to 0 --
-    not because performance was zero, but because the query never succeeded.
-
-    This runs a minimal, isolated call first so failures are loud and
-    specific instead of silently poisoning the whole dataset.
-    """
     try:
         end_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         probe = youtube_analytics.reports().query(
@@ -125,8 +111,102 @@ def check_analytics_access(youtube_analytics, channel_id):
         traceback.print_exc()
         return False
 
+# --- PER-VIDEO METRICS (BATCHED QUERY FIX) ---
+def fetch_per_video_metrics(youtube_analytics, channel_id, video_ids):
+    print("Retrieving per-video metrics from YouTube Analytics API v2...")
+    analytics_data = {}
+    end_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    
+    # Query in batches of 50 video IDs using explicit video filter
+    batch_size = 50
+    for i in range(0, len(video_ids), batch_size):
+        batch = video_ids[i:i + batch_size]
+        filter_str = f"video=={','.join(batch)}"
+        try:
+            response = youtube_analytics.reports().query(
+                ids=f"channel=={channel_id}",
+                startDate="2005-01-01",
+                endDate=end_date,
+                metrics="views,likes,shares,comments,estimatedMinutesWatched,averageViewDuration,averageViewPercentage,subscribersGained",
+                dimensions="video",
+                filters=filter_str,
+                maxResults=500,
+            ).execute()
+            
+            rows = response.get("rows", [])
+            for row in rows:
+                vid_id = row[0]
+                analytics_data[vid_id] = {
+                    "views_analytics": int(row[1] or 0),
+                    "likes_analytics": int(row[2] or 0),
+                    "shares": int(row[3] or 0),
+                    "comments_analytics": int(row[4] or 0),
+                    "estimated_minutes_watched": float(row[5] or 0.0),
+                    "average_view_duration_sec": int(row[6] or 0),
+                    "average_view_percentage": float(row[7] or 0.0),
+                    "subscribers_gained": int(row[8] or 0),
+                }
+        except Exception:
+            print(f"\n[Warning] Metrics query failed for batch starting at index {i}:")
+            traceback.print_exc()
+            
+    print(f"Retrieved analytics performance rows for {len(analytics_data)} videos.")
+    return analytics_data
+
+# --- PER-VIDEO TRAFFIC SOURCE BREAKDOWN ---
+def fetch_traffic_source_breakdown(youtube_analytics, channel_id, video_ids):
+    print("Retrieving per-video traffic source breakdown from YouTube Analytics API v2...")
+    breakdown = {}
+    end_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    
+    # Smaller batch size (20) reduces API backend internal errors on 2D queries
+    batch_size = 20
+    
+    for i in range(0, len(video_ids), batch_size):
+        batch = video_ids[i:i + batch_size]
+        filter_str = f"video=={','.join(batch)}"
+        
+        # Retry loop for transient 500/503 backend errors
+        max_retries = 3
+        for attempt in range(1, max_retries + 1):
+            try:
+                response = youtube_analytics.reports().query(
+                    ids=f"channel=={channel_id}",
+                    startDate="2005-01-01",
+                    endDate=end_date,
+                    metrics="views",
+                    dimensions="video,insightTrafficSourceType",
+                    filters=filter_str,
+                    maxResults=10000,
+                ).execute()
+                
+                rows = response.get("rows", [])
+                for row in rows:
+                    vid_id, source_type, views = row[0], row[1], int(row[2] or 0)
+                    breakdown.setdefault(vid_id, {})[source_type] = views
+                break  # Success: exit retry loop
+                
+            except HttpError as e:
+                # Catch 500 / 503 Internal Server Errors and retry
+                if e.resp.status in (500, 503) and attempt < max_retries:
+                    sleep_time = attempt * 2
+                    print(f"  [Retry {attempt}/{max_retries}] Transient error on batch starting index {i}. Retrying in {sleep_time}s...")
+                    time.sleep(sleep_time)
+                else:
+                    print(f"\n[Warning] Traffic source query failed for batch starting at index {i}:")
+                    traceback.print_exc()
+                    break
+            except Exception:
+                print(f"\n[Warning] Unexpected error on batch starting at index {i}:")
+                traceback.print_exc()
+                break
+            
+    print(f"Retrieved traffic source data for {len(breakdown)} videos.")
+    return breakdown
+
 # --- DATA ACQUISITION ---
 def fetch_youtube_data():
+    load_env()
     creds = get_credentials()
     youtube = build("youtube", "v3", credentials=creds)
     youtube_analytics = build("youtubeAnalytics", "v2", credentials=creds)
@@ -166,8 +246,6 @@ def fetch_youtube_data():
     print("Retrieving metadata, statistics, and privacy status from Data API v3...")
     for i in range(0, len(video_ids), 50):
         batch_ids = video_ids[i:i+50]
-        # Added "status" part -> gives us privacyStatus so we can tell what's
-        # ACTUALLY public vs. private/unlisted, instead of guessing from titles.
         res = youtube.videos().list(
             id=",".join(batch_ids),
             part="snippet,contentDetails,statistics,status"
@@ -194,58 +272,19 @@ def fetch_youtube_data():
                 "likes": int(statistics.get("likeCount", 0)),
                 "comments": int(statistics.get("commentCount", 0)),
                 "privacy_status": status.get("privacyStatus", "unknown"),
-                # Flags a title still carrying pipeline placeholder text --
-                # this should never reach a public upload.
                 "is_flagged_draft": bool(re.search(r"\[DRAFT\]", title, re.IGNORECASE)),
                 "has_no_tags": len(tags) == 0,
             }
 
     analytics_data = {}
+    traffic_source_data = {}
     if analytics_ok:
-        print("Retrieving per-video metrics from YouTube Analytics API v2...")
-        try:
-            end_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-            analytics_response = youtube_analytics.reports().query(
-                ids=f"channel=={channel_id}",
-                startDate="2005-01-01",
-                endDate=end_date,
-                metrics="views,likes,dislikes,shares,comments,estimatedMinutesWatched,averageViewDuration,averageViewPercentage,subscribersGained",
-                dimensions="video",
-                maxResults=10000,  # explicit, generous cap so large channels don't get silently truncated
-            ).execute()
-
-            rows = analytics_response.get("rows", [])
-            print(f"Retrieved analytics performance rows for {len(rows)} videos.")
-
-            if len(rows) == 0 and len(video_details) > 0:
-                print(
-                    "[Warning] Analytics API call succeeded but returned 0 rows for "
-                    f"{len(video_details)} known videos. Per-video retention/watch-time "
-                    "data will be unavailable this run -- check date range and channel activity."
-                )
-
-            for row in rows:
-                vid_id = row[0]
-                analytics_data[vid_id] = {
-                    "views_analytics": int(row[1] or 0),
-                    "likes_analytics": int(row[2] or 0),
-                    "dislikes": int(row[3] or 0),
-                    "shares": int(row[4] or 0),
-                    "comments_analytics": int(row[5] or 0),
-                    "estimated_minutes_watched": float(row[6] or 0.0),
-                    "average_view_duration_sec": int(row[7] or 0),
-                    "average_view_percentage": float(row[8] or 0.0),
-                    "subscribers_gained": int(row[9] or 0),
-                }
-        except Exception:
-            print("\n[Warning] Analytics API query for per-video metrics failed after the initial probe succeeded:")
-            traceback.print_exc()
-            print("Falling back to Data API stats only for this run.\n")
+        analytics_data = fetch_per_video_metrics(youtube_analytics, channel_id, video_ids)
+        traffic_source_data = fetch_traffic_source_breakdown(youtube_analytics, channel_id, video_ids)
     else:
-        print("Skipping per-video Analytics API query since the access probe failed above.")
-        print("Retention %, watch time, shares, and subscriber-gained fields will be recorded as 'unavailable', not silently zeroed.\n")
+        print("Skipping per-video Analytics API queries since the access probe failed above.\n")
 
-    print("Merging metadata and analytics datasets...")
+    print("Merging metadata, analytics, and traffic source datasets...")
     combined_records = []
     ist_tz = timezone(timedelta(hours=5, minutes=30))
     now_ist = datetime.now(ist_tz)
@@ -255,7 +294,7 @@ def fetch_youtube_data():
         analytics_available = an is not None
         if an is None:
             an = {
-                "views_analytics": 0, "likes_analytics": 0, "dislikes": 0, "shares": 0,
+                "views_analytics": 0, "likes_analytics": 0, "shares": 0,
                 "comments_analytics": 0, "estimated_minutes_watched": 0.0,
                 "average_view_duration_sec": 0, "average_view_percentage": 0.0,
                 "subscribers_gained": 0,
@@ -274,6 +313,28 @@ def fetch_youtube_data():
         comments_per_100_views = (comments / views * 100) if views > 0 else 0.0
         shares_per_100_views = (an["shares"] / views * 100) if views > 0 and analytics_available else 0.0
         subs_per_100_views = (an["subscribers_gained"] / views * 100) if views > 0 and analytics_available else 0.0
+
+        sources = traffic_source_data.get(vid_id, {})
+        traffic_available = len(sources) > 0
+        total_source_views = sum(sources.values()) if sources else 0
+
+        def source_pct(*names):
+            if not traffic_available or total_source_views == 0:
+                return None
+            v = sum(sources.get(n, 0) for n in names)
+            return round(v / total_source_views * 100, 2)
+
+        pct_shorts_feed = source_pct("SHORTS")
+        pct_subscriber = source_pct("SUBSCRIBER")
+        pct_notification = source_pct("NOTIFICATION")
+        pct_suggested = source_pct("RELATED_VIDEO", "SUGGESTED_VIDEO")
+        pct_search = source_pct("YT_SEARCH", "SEARCH")
+        pct_external = source_pct("EXT_URL")
+
+        top_sources_str = ""
+        if traffic_available:
+            top_sorted = sorted(sources.items(), key=lambda kv: kv[1], reverse=True)[:TOP_N_TRAFFIC_SOURCES]
+            top_sources_str = "; ".join(f"{name}:{v}" for name, v in top_sorted)
 
         record = {
             "video_id": vid_id,
@@ -305,6 +366,14 @@ def fetch_youtube_data():
             "comments_per_100_views": round(comments_per_100_views, 2),
             "shares_per_100_views": round(shares_per_100_views, 2) if analytics_available else None,
             "subscribers_per_100_views": round(subs_per_100_views, 2) if analytics_available else None,
+            "traffic_available": int(traffic_available),
+            "pct_traffic_shorts_feed": pct_shorts_feed,
+            "pct_traffic_subscriber": pct_subscriber,
+            "pct_traffic_notification": pct_notification,
+            "pct_traffic_suggested": pct_suggested,
+            "pct_traffic_search": pct_search,
+            "pct_traffic_external": pct_external,
+            "top_traffic_sources": top_sources_str,
         }
         combined_records.append(record)
 
@@ -322,37 +391,6 @@ def save_to_csv(data):
         writer.writeheader()
         writer.writerows(data)
     print(f"Successfully exported {len(data)} video records to CSV: {CSV_PATH}")
-
-# --- UPLOAD CADENCE / BURST DETECTION ---
-def analyze_upload_cadence(data):
-    """
-    Detects same-day upload bursts (uploads published within BURST_GAP_MINUTES
-    of each other). Dense bursts are a likely cause of suppressed reach --
-    YouTube doesn't push several same-channel uploads to the same audience
-    in a short window, and unusually dense publishing can read as spam-like.
-    """
-    sorted_data = sorted(data, key=lambda v: v["publish_time_ist"])
-    bursts = []
-    current_burst = []
-    prev_dt = None
-
-    for v in sorted_data:
-        dt = datetime.strptime(v["publish_time_ist"], "%Y-%m-%d %H:%M:%S")
-        if prev_dt is not None:
-            gap_minutes = (dt - prev_dt).total_seconds() / 60.0
-            if gap_minutes <= BURST_GAP_MINUTES:
-                if not current_burst:
-                    current_burst.append(sorted_data[sorted_data.index(v) - 1])
-                current_burst.append(v)
-            else:
-                if len(current_burst) >= 3:
-                    bursts.append(list(current_burst))
-                current_burst = []
-        prev_dt = dt
-    if len(current_burst) >= 3:
-        bursts.append(list(current_burst))
-
-    return bursts
 
 # --- ANALYSE DATA ---
 def perform_analysis(data):
@@ -372,13 +410,11 @@ def perform_analysis(data):
     shorts = [v for v in data if v["is_short"] == 1]
     longs = [v for v in data if v["is_short"] == 0]
 
-    # Only use "mature" videos (past the maturity threshold) for performance
-    # rankings/day/hour analysis, so brand-new uploads with 0 views by
-    # necessity don't distort the picture.
     mature_data = [v for v in data if v["is_mature"] == 1]
     immature_data = [v for v in data if v["is_mature"] == 0]
 
     any_analytics = any(v["analytics_available"] for v in data)
+    any_traffic = any(v["traffic_available"] for v in data)
 
     total_views = sum(v["views"] for v in data)
     total_likes = sum(v["likes"] for v in data)
@@ -392,8 +428,8 @@ def perform_analysis(data):
     if not any_analytics:
         report.append(
             "- **Analytics API data is UNAVAILABLE for this run.** Retention %, watch-time, "
-            "shares, and subscriber-gained figures below are omitted rather than shown as a "
-            "misleading 0. See console output for the specific auth/scope error."
+            "shares, subscriber-gained, and traffic source figures below are omitted rather "
+            "than shown as a misleading 0."
         )
     else:
         missing = sum(1 for v in data if v["analytics_available"] == 0)
@@ -401,16 +437,17 @@ def perform_analysis(data):
             report.append(f"- Analytics data missing for {missing}/{total_videos} videos (partial failure).")
         else:
             report.append("- Analytics API data retrieved successfully for all videos.")
+        if not any_traffic:
+            report.append("- ⚠️ Traffic source breakdown unavailable this run.")
 
     flagged_drafts = [v for v in data if v["is_flagged_draft"] == 1]
     if flagged_drafts:
         report.append(
-            f"- 🚨 **{len(flagged_drafts)} videos are live/public with a leftover `[DRAFT]` title** "
-            "(pipeline bug: these were meant to stay private). See 'Flagged Videos' section below."
+            f"- 🚨 **{len(flagged_drafts)} videos are live/public with a leftover `[DRAFT]` title**."
         )
     no_tag_count = sum(1 for v in data if v["has_no_tags"] == 1)
     report.append(f"- {no_tag_count}/{total_videos} videos ({no_tag_count/total_videos*100:.1f}%) have zero tags.")
-    report.append(f"- {len(immature_data)} videos are younger than {MATURITY_THRESHOLD_DAYS} days and excluded from performance rankings below (still too new to judge).")
+    report.append(f"- {len(immature_data)} videos are younger than {MATURITY_THRESHOLD_DAYS} days and excluded from performance rankings.")
     report.append("")
 
     report.append("## 📊 Channel Overview Stats")
@@ -427,10 +464,10 @@ def perform_analysis(data):
         report.append(f"- **Total Estimated Minutes Watched:** {total_watch:,.2f} mins ({total_watch/60:,.1f} hours)")
     report.append("")
 
-    # Shorts vs Long-form (mature only)
+    # Format Performance
     report.append("## 🎥 Format Head-to-Head (Shorts vs Long-form, mature videos only)")
-    report.append("| Format | Count | Average Views | Median Views | Avg Like Rate % | Avg Comment Rate % |")
-    report.append("| --- | --- | --- | --- | --- | --- |")
+    report.append("| Format | Count | Average Views | Median Views | Avg Like Rate % | Avg Comment Rate % | Avg Retention % |")
+    report.append("| --- | --- | --- | --- | --- | --- | --- |")
     for label, group in [("Shorts (<=60s)", [v for v in mature_data if v["is_short"] == 1]),
                           ("Long-form (>60s)", [v for v in mature_data if v["is_short"] == 0])]:
         if group:
@@ -438,114 +475,73 @@ def perform_analysis(data):
             med_v = median([v["views"] for v in group])
             avg_lr = mean([v["likes_per_100_views"] for v in group])
             avg_cr = mean([v["comments_per_100_views"] for v in group])
-            report.append(f"| {label} | {len(group)} | {avg_v:.1f} | {med_v:.2f} | {avg_lr:.2f}% | {avg_cr:.2f}% |")
+            ret_vals = [v["average_view_percentage"] for v in group if v["average_view_percentage"] is not None]
+            avg_ret = mean(ret_vals) if ret_vals else None
+            ret_str = f"{avg_ret:.1f}%" if avg_ret is not None else "N/A"
+            report.append(f"| {label} | {len(group)} | {avg_v:.1f} | {med_v:.2f} | {avg_lr:.2f}% | {avg_cr:.2f}% | {ret_str} |")
         else:
-            report.append(f"| {label} | 0 | 0.0 | 0.0 | 0.00% | 0.00% |")
+            report.append(f"| {label} | 0 | 0.0 | 0.0 | 0.00% | 0.00% | N/A |")
     report.append("")
 
-    # Tag impact
-    report.append("## 🏷️ Tag Presence Impact (mature videos only)")
-    report.append("| Group | Count | Avg Views |")
-    report.append("| --- | --- | --- |")
-    tagged = [v for v in mature_data if v["has_no_tags"] == 0]
-    untagged = [v for v in mature_data if v["has_no_tags"] == 1]
-    if tagged:
-        report.append(f"| Has tags | {len(tagged)} | {mean([v['views'] for v in tagged]):.1f} |")
-    if untagged:
-        report.append(f"| No tags | {len(untagged)} | {mean([v['views'] for v in untagged]):.1f} |")
-    report.append("")
+    # Traffic Sources
+    if any_traffic:
+        report.append("## 🚦 Traffic Source Breakdown (Mature Shorts)")
+        mature_shorts = [v for v in mature_data if v["is_short"] == 1 and v["traffic_available"] == 1]
+        if mature_shorts:
+            sorted_by_views = sorted(mature_shorts, key=lambda v: v["views"])
+            n = len(sorted_by_views)
+            bottom_third = sorted_by_views[: max(1, n // 3)]
+            top_third = sorted_by_views[-max(1, n // 3):]
 
-    # Upload Day
+            def avg_pct(group, field):
+                vals = [v[field] for v in group if v[field] is not None]
+                return mean(vals) if vals else None
+
+            report.append("| Group | Count | Avg Views | Avg % Shorts Feed | Avg % Subscriber | Avg % Notification | Avg % Suggested | Avg % Search |")
+            report.append("| --- | --- | --- | --- | --- | --- | --- | --- |")
+            for label, group in [("Bottom 1/3 by views", bottom_third), ("Top 1/3 by views", top_third)]:
+                avg_v = mean([v["views"] for v in group])
+                shorts_pct = avg_pct(group, "pct_traffic_shorts_feed")
+                sub_pct = avg_pct(group, "pct_traffic_subscriber")
+                notif_pct = avg_pct(group, "pct_traffic_notification")
+                sugg_pct = avg_pct(group, "pct_traffic_suggested")
+                search_pct = avg_pct(group, "pct_traffic_search")
+                fmt = lambda x: f"{x:.1f}%" if x is not None else "N/A"
+                report.append(f"| {label} | {len(group)} | {avg_v:.1f} | {fmt(shorts_pct)} | {fmt(sub_pct)} | {fmt(notif_pct)} | {fmt(sugg_pct)} | {fmt(search_pct)} |")
+            report.append("")
+
+    # Day of Week Performance
     report.append("## 📅 Upload Day Performance (IST, mature videos only)")
     report.append("| Upload Day | Video Count | Total Views | Average Views |")
     report.append("| --- | --- | --- | --- |")
     day_groups = {}
     for v in mature_data:
         day_groups.setdefault(v["publish_day"], []).append(v)
+    
     days_order = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
-    day_metrics = []
     for day in days_order:
-        vids = day_groups.get(day, [])
-        if vids:
-            day_views = sum(v["views"] for v in vids)
-            avg_views = day_views / len(vids)
-            day_metrics.append((day, len(vids), day_views, avg_views))
-            report.append(f"| {day} | {len(vids)} | {day_views:,} | {avg_views:.1f} |")
-    if day_metrics:
-        best_day = max(day_metrics, key=lambda x: x[3])
-        report.append(f"\n💡 **Golden Day Insight:** **{best_day[0]}** leads with an average of **{best_day[3]:.1f}** views/video.\n")
+        group = day_groups.get(day, [])
+        if group:
+            tot_v = sum(v["views"] for v in group)
+            avg_v = mean([v["views"] for v in group])
+            report.append(f"| {day} | {len(group)} | {tot_v:,} | {avg_v:.1f} |")
+        else:
+            report.append(f"| {day} | 0 | 0 | 0.0 |")
 
-    # Upload Hour
-    report.append("## ⏰ Upload Hour Analysis (IST, mature videos only)")
-    report.append("| Hour Slot (IST) | Count | Average Views |")
-    report.append("| --- | --- | --- |")
-    hour_groups = {}
-    for v in mature_data:
-        hour_groups.setdefault(v["publish_hour"], []).append(v)
-    hour_metrics = []
-    for hour in range(24):
-        vids = hour_groups.get(hour, [])
-        if vids:
-            avg_views = sum(v["views"] for v in vids) / len(vids)
-            hour_metrics.append((hour, len(vids), avg_views))
-            report.append(f"| {hour:02d}:00 | {len(vids)} | {avg_views:.1f} |")
-    if hour_metrics:
-        # require a minimum sample size so a single lucky video doesn't crown an hour
-        reliable = [h for h in hour_metrics if h[1] >= 5] or hour_metrics
-        best_hour = max(reliable, key=lambda x: x[2])
-        report.append(f"\n💡 **Golden Hour Insight:** **{best_hour[0]:02d}:00 IST** (from slots with >=5 uploads) averages **{best_hour[2]:.1f}** views.\n")
-
-    # Upload cadence / burst detection
-    report.append("## 🚨 Upload Cadence & Burst Risk")
-    bursts = analyze_upload_cadence(data)
-    if bursts:
-        report.append(
-            f"Detected {len(bursts)} burst window(s) where 3+ videos were published within "
-            f"{BURST_GAP_MINUTES} minutes of each other. Rapid same-channel bursts are a likely "
-            "cause of suppressed algorithmic reach -- consider spacing daily uploads out."
-        )
-        for b in bursts[:10]:
-            start = b[0]["publish_time_ist"]
-            end = b[-1]["publish_time_ist"]
-            report.append(f"- {start} → {end}: {len(b)} videos published back-to-back")
-    else:
-        report.append("No burst windows detected.")
-    report.append("")
-
-    # Flagged videos
-    if flagged_drafts:
-        report.append("## 🏴 Flagged Videos (leftover [DRAFT] titles, action needed)")
-        report.append("| Title | Privacy Status | Tags | Views |")
-        report.append("| --- | --- | --- | --- |")
-        for v in flagged_drafts:
-            report.append(f"| {v['title']} | {v['privacy_status']} | {v['tags_count']} | {v['views']} |")
-        report.append("")
-
-    # Leaderboard (mature only)
-    report.append("## 🏆 Top 10 Videos by View Count (mature videos only)")
-    report.append("| Video Title | Type | Views | Like Ratio |")
-    report.append("| --- | --- | --- | --- |")
-    views_sorted = sorted(mature_data, key=lambda x: x["views"], reverse=True)[:10]
-    for v in views_sorted:
-        vtype = "Short" if v["is_short"] == 1 else "Long"
-        report.append(f"| [{v['title']}]({v['url']}) | {vtype} | {v['views']:,} | {v['likes_per_100_views']:.2f}% |")
-
+    WORK_DIR.mkdir(parents=True, exist_ok=True)
     with open(REPORT_PATH, "w", encoding="utf-8") as f:
         f.write("\n".join(report))
-
     print(f"Successfully generated analysis report: {REPORT_PATH}")
 
-# --- MAIN ---
+# --- MAIN RUNNER ---
 def main():
-    load_env()
     try:
         data = fetch_youtube_data()
         save_to_csv(data)
         perform_analysis(data)
     except Exception:
-        print("\n[Fatal Error] Application failed:")
+        print("\n[CRITICAL ERROR] Script execution failed:")
         traceback.print_exc()
-        sys.exit(1)
 
 if __name__ == "__main__":
     main()
