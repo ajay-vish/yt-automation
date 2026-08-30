@@ -65,10 +65,10 @@
     "k_jbNiZDzb4",
     "MMozYW545gQ",
     "f28_DGe_eeg",
-    "kC2PvSrPbGI"
+    "kC2PvSrPbGI",
+    "K6EuvxbrX0M"
   ],
   "scheduled_slots": [
-    "2026-08-30T13:30:00Z",
     "2026-08-30T15:30:00Z",
     "2026-08-31T07:30:00Z",
     "2026-08-31T13:30:00Z",
@@ -154,7 +154,8 @@
     "2026-09-27T07:30:00Z",
     "2026-09-27T13:30:00Z",
     "2026-09-27T15:30:00Z",
-    "2026-09-28T07:30:00Z"
+    "2026-09-28T07:30:00Z",
+    "2026-09-28T13:30:00Z"
   ],
   "pending_comments": {
     "gsSIIR9k-pY": {
@@ -3660,6 +3661,10 @@
     "vOw7oPau99c": {
       "source_id": "kC2PvSrPbGI",
       "title": "\u092a\u0930\u0902\u092a\u0930\u093e\u0917\u0924 \u092d\u094b\u091c\u092a\u0941\u0930\u0940 \u0935\u093f\u0935\u093e\u0939 \u0917\u0940\u0924: \u092c\u0947\u091f\u0940 \u0915\u0947 \u0935\u093f\u0926\u093e\u0908 \u0915\u093e \u0926\u0930\u094d\u0926 | Manju Lokgeet"
+    },
+    "um76zTP1GL8": {
+      "source_id": "K6EuvxbrX0M",
+      "title": "\u092a\u0941\u0930\u0941\u092c \u091c\u0907\u0939\u093e \u092f\u093e \u092a\u0936\u094d\u091a\u093f\u092e \u092d\u0932\u0947 \u0930\u093e\u091c\u093e \u0926\u0930\u093f\u092f\u093e\u0907\u092f\u093e \u0932\u0947 \u0905\u0907\u0939\u093f\u092f\u093e \u092d\u0932\u0947 \u0930\u093e\u091c\u093e | Vivah jhumar geet | Manju Lokgeet"
     }
   },
   "commented_video_ids": [
