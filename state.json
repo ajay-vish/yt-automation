@@ -67,10 +67,10 @@
     "f28_DGe_eeg",
     "kC2PvSrPbGI",
     "K6EuvxbrX0M",
-    "u3dO7uAaNRY"
+    "u3dO7uAaNRY",
+    "6QW3Hfsz0TU"
   ],
   "scheduled_slots": [
-    "2026-08-31T07:30:00Z",
     "2026-08-31T13:30:00Z",
     "2026-08-31T15:30:00Z",
     "2026-09-01T07:30:00Z",
@@ -156,7 +156,8 @@
     "2026-09-27T15:30:00Z",
     "2026-09-28T07:30:00Z",
     "2026-09-28T13:30:00Z",
-    "2026-09-28T15:30:00Z"
+    "2026-09-28T15:30:00Z",
+    "2026-09-29T07:30:00Z"
   ],
   "pending_comments": {
     "gsSIIR9k-pY": {
@@ -3662,6 +3663,10 @@
     "-f_VsnH1Bz0": {
       "source_id": "u3dO7uAaNRY",
       "title": "Bhojpuri Vivah Jhoomer Geet - A High-Energy Wedding Celebration!"
+    },
+    "o51l7Z6S_ZY": {
+      "source_id": "6QW3Hfsz0TU",
+      "title": "Sate Ghadi Me Sita Jevana Banaveli | New Bhojpuri Vivah Lokgeet 2026 | Ram Vivah #Bhojpuri #Lokgeet"
     }
   },
   "commented_video_ids": [
