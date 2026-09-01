@@ -71,10 +71,10 @@
     "6QW3Hfsz0TU",
     "GHwLnj4X-n0",
     "7gFA7MjNEBI",
-    "TUVVA--0PuA"
+    "TUVVA--0PuA",
+    "97EhQDndn9Y"
   ],
   "scheduled_slots": [
-    "2026-09-01T15:30:00Z",
     "2026-09-02T07:30:00Z",
     "2026-09-02T13:30:00Z",
     "2026-09-02T15:30:00Z",
@@ -159,7 +159,8 @@
     "2026-09-29T07:30:00Z",
     "2026-09-29T13:30:00Z",
     "2026-09-29T15:30:00Z",
-    "2026-09-30T07:30:00Z"
+    "2026-09-30T07:30:00Z",
+    "2026-09-30T13:30:00Z"
   ],
   "pending_comments": {
     "gsSIIR9k-pY": {
@@ -3657,6 +3658,10 @@
     "LJJFbkwMz_I": {
       "source_id": "TUVVA--0PuA",
       "title": "\u092e\u0947\u0930\u0947 \u0918\u0930 \u092e\u0947\u0902 \u092a\u0927\u093e\u0930\u094b \u0917\u0923\u0947\u0936 \u091c\u0940 | Ganesh Ji 2025 Bhajan | Bhojpuri Lokgeet | New Ganpati Song"
+    },
+    "uGqr2ca9uek": {
+      "source_id": "97EhQDndn9Y",
+      "title": "Paach Tho Patawa Mangawani Pachis Tho Supariya | 2025 NEW Devi Geet | Maiya Rani Ke Bhajan"
     }
   },
   "commented_video_ids": [
