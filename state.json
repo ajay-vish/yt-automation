@@ -75,10 +75,10 @@
     "97EhQDndn9Y",
     "PFrWjxEt_qI",
     "4H3AIyiGI8I",
-    "Mn_RgB38QKc"
+    "Mn_RgB38QKc",
+    "ioVQE-CJ4xY"
   ],
   "scheduled_slots": [
-    "2026-09-03T07:30:00Z",
     "2026-09-03T13:30:00Z",
     "2026-09-03T15:30:00Z",
     "2026-09-04T07:30:00Z",
@@ -163,7 +163,8 @@
     "2026-09-30T13:30:00Z",
     "2026-09-30T15:30:00Z",
     "2026-10-01T07:30:00Z",
-    "2026-10-01T13:30:00Z"
+    "2026-10-01T13:30:00Z",
+    "2026-10-01T15:30:00Z"
   ],
   "pending_comments": {
     "gsSIIR9k-pY": {
@@ -3665,6 +3666,10 @@
     "UhzkaqHfwwE": {
       "source_id": "Mn_RgB38QKc",
       "title": "\u0938\u094b\u0928\u0947 \u0915\u0947 \u0925\u093e\u0932\u0940 \u092e\u0947\u0902 \u091c\u0947\u0935\u0928\u093e \u092c\u0928\u093e\u0935\u0932\u094b \u090f \u0930\u093e\u092e | Saryu Nadi Ghat | Ganga Nadi | Ayodhya | Manju Lokgeet #diwali"
+    },
+    "xPXDojC_St4": {
+      "source_id": "ioVQE-CJ4xY",
+      "title": "\u0917\u0902\u0917\u093e \u092e\u0907\u092f\u093e \u0915\u0940 \u090a\u0901\u091a\u0940 \u0905\u091f\u0930\u093f\u092f\u093e \u2013 \u0925\u0921\u094d\u0921\u0940 \u0918\u093e\u091f \u092d\u0915\u094d\u0924\u093f \u0917\u0940\u0924 | Tripurari Purnima Special Lokgeet \ud83c\udfb6"
     }
   },
   "commented_video_ids": [
