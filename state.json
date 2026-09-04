@@ -78,10 +78,10 @@
     "Mn_RgB38QKc",
     "ioVQE-CJ4xY",
     "ZadC67z8CJQ",
-    "KPcRrmpixxc"
+    "KPcRrmpixxc",
+    "xaXBDu_3INg"
   ],
   "scheduled_slots": [
-    "2026-09-04T07:30:00Z",
     "2026-09-04T13:30:00Z",
     "2026-09-04T15:30:00Z",
     "2026-09-05T07:30:00Z",
@@ -166,7 +166,8 @@
     "2026-10-01T13:30:00Z",
     "2026-10-01T15:30:00Z",
     "2026-10-02T07:30:00Z",
-    "2026-10-02T13:30:00Z"
+    "2026-10-02T13:30:00Z",
+    "2026-10-02T15:30:00Z"
   ],
   "pending_comments": {
     "gsSIIR9k-pY": {
@@ -3668,6 +3669,10 @@
     "p14ZObvHZ3g": {
       "source_id": "KPcRrmpixxc",
       "title": "Nakata Zhoomer Bhojpuri Geet | Manju Lokgeet #bhojpuri #lokgeet #manjulakgeetImmerse"
+    },
+    "jI5NgMl054g": {
+      "source_id": "xaXBDu_3INg",
+      "title": "Sari Samayiya Ae Baba Bihah | UP Vivah Lokgeet 2025 | Manju Vishwakarma"
     }
   },
   "commented_video_ids": [
