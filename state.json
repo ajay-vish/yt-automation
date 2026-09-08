@@ -89,10 +89,10 @@
     "DuhNlTsbg_M",
     "b8hJboAWMI8",
     "nwYw9e2l2dU",
-    "AnuSelnSlD4"
+    "AnuSelnSlD4",
+    "lmMyfXs-vDs"
   ],
   "scheduled_slots": [
-    "2026-09-08T07:30:00Z",
     "2026-09-08T13:30:00Z",
     "2026-09-08T15:30:00Z",
     "2026-09-09T07:30:00Z",
@@ -176,7 +176,8 @@
     "2026-10-05T07:30:00Z",
     "2026-10-05T13:30:00Z",
     "2026-10-05T15:30:00Z",
-    "2026-10-06T07:30:00Z"
+    "2026-10-06T07:30:00Z",
+    "2026-10-06T13:30:00Z"
   ],
   "pending_comments": {
     "gsSIIR9k-pY": {
@@ -3674,6 +3675,10 @@
     "x9JjzcNsmVE": {
       "source_id": "AnuSelnSlD4",
       "title": "Kumbh Special: Shiv Bhajan in Bhojpuri | Powerful Devotional Song | Manju Lokgeet"
+    },
+    "xGPpYH2wH7c": {
+      "source_id": "lmMyfXs-vDs",
+      "title": "Bhasur gurhatti geet | Manju Lokgeet"
     }
   },
   "commented_video_ids": [
