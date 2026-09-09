@@ -94,10 +94,10 @@
     "Pwv7AGrJl2I",
     "Juu9F-o6My4",
     "aSSksvRKJLg",
-    "3Zlg7U2WMq8"
+    "3Zlg7U2WMq8",
+    "sYW_JzX4Zlk"
   ],
   "scheduled_slots": [
-    "2026-09-09T15:30:00Z",
     "2026-09-10T07:30:00Z",
     "2026-09-10T13:30:00Z",
     "2026-09-10T15:30:00Z",
@@ -181,7 +181,8 @@
     "2026-10-06T15:30:00Z",
     "2026-10-07T07:30:00Z",
     "2026-10-07T13:30:00Z",
-    "2026-10-07T15:30:00Z"
+    "2026-10-07T15:30:00Z",
+    "2026-10-08T07:30:00Z"
   ],
   "pending_comments": {
     "gsSIIR9k-pY": {
@@ -3675,6 +3676,10 @@
     "gEKnu6i_bvc": {
       "source_id": "3Zlg7U2WMq8",
       "title": "\u0915\u093e\u0936\u0940 \u092e\u0947\u0902 \u092e\u0921\u093c\u0908 \u091a\u0935\u0935\u0928\u0947 \u0939\u094b \u0917\u094c\u0930\u093e | Shiv Charcha 2025 Geet | Bhojpuri Lokgeet | Devotional Bhajan"
+    },
+    "B9OZICRIv2U": {
+      "source_id": "sYW_JzX4Zlk",
+      "title": "Aa gaine doliya kahar mai ke \u2022 Navratri special geet #navratri2024"
     }
   },
   "commented_video_ids": [
