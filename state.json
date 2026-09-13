@@ -106,10 +106,10 @@
     "yozea0xcQv4",
     "jUiG8jPfZM0",
     "cXgbVDNikIA",
-    "ZllUbv2XyK8"
+    "ZllUbv2XyK8",
+    "KG5pJjOT5jY"
   ],
   "scheduled_slots": [
-    "2026-09-13T15:30:00Z",
     "2026-09-14T07:30:00Z",
     "2026-09-14T13:30:00Z",
     "2026-09-14T15:30:00Z",
@@ -193,7 +193,8 @@
     "2026-10-10T15:30:00Z",
     "2026-10-11T07:30:00Z",
     "2026-10-11T13:30:00Z",
-    "2026-10-11T15:30:00Z"
+    "2026-10-11T15:30:00Z",
+    "2026-10-12T07:30:00Z"
   ],
   "pending_comments": {
     "gsSIIR9k-pY": {
@@ -3687,6 +3688,10 @@
     "wbFV4fnlkE8": {
       "source_id": "ZllUbv2XyK8",
       "title": "Bhojpuri Devi Geet | \u092e\u094b\u0930\u0935\u093e \u0928\u093e\u091a\u0947 \u092e\u094b\u0930\u093f\u0928\u093f\u092f\u093e \u0915\u094b\u092f\u093f\u0932\u093f\u092f\u093e \u0917\u093e\u0935\u0947 | Navratri Special 2025"
+    },
+    "5M9QoK52EmA": {
+      "source_id": "KG5pJjOT5jY",
+      "title": "Devi Maiya Special | Navratri 2025 Folk Song \u2013 Doodh Ke Bhare Jaldhara"
     }
   },
   "commented_video_ids": [
