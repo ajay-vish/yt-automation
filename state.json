@@ -119,10 +119,10 @@
     "jpTXQ_JiOyM",
     "hQtorr5_7C0",
     "N4QHxfjlh4w",
-    "qMVxgHt5mZo"
+    "qMVxgHt5mZo",
+    "nYzl3mAcJ44"
   ],
   "scheduled_slots": [
-    "2026-09-18T13:30:00Z",
     "2026-09-18T15:30:00Z",
     "2026-09-19T07:30:00Z",
     "2026-09-19T13:30:00Z",
@@ -205,7 +205,8 @@
     "2026-10-15T07:30:00Z",
     "2026-10-15T13:30:00Z",
     "2026-10-15T15:30:00Z",
-    "2026-10-16T07:30:00Z"
+    "2026-10-16T07:30:00Z",
+    "2026-10-16T13:30:00Z"
   ],
   "pending_comments": {
     "gsSIIR9k-pY": {
@@ -3699,6 +3700,10 @@
     "_qNQockgIZg": {
       "source_id": "qMVxgHt5mZo",
       "title": "\u0915\u094c\u0928\u0947 \u092c\u0928 \u0928\u0947 \u0930\u0939\u0932\u0941 \u0910 \u0915\u094b\u0907\u0932\u0930 | Beti Vivah Geet | Traditional Bhojpuri Wedding Song 2025"
+    },
+    "-roXZv1Z0Ek": {
+      "source_id": "nYzl3mAcJ44",
+      "title": "\u091a\u093f\u0920\u093f\u092f\u093e \u092a\u0947 \u091a\u093f\u0920\u093f\u092f\u093e \u0932\u093f\u0916\u093f\u0932\u0947 \u0932\u0940 \u0917\u094c\u0930\u093e \u0926\u0947\u0935\u0940 | Manju Lokgeet | Saavan Day 2 | Traditional Folk Song \ud83c\udfb6\ud83c\udf27\ufe0f"
     }
   },
   "commented_video_ids": [
