@@ -121,10 +121,10 @@
     "N4QHxfjlh4w",
     "qMVxgHt5mZo",
     "nYzl3mAcJ44",
-    "Fx-mY1zsK7o"
+    "Fx-mY1zsK7o",
+    "Y40ykUWDkdw"
   ],
   "scheduled_slots": [
-    "2026-09-19T07:30:00Z",
     "2026-09-19T13:30:00Z",
     "2026-09-19T15:30:00Z",
     "2026-09-20T07:30:00Z",
@@ -207,7 +207,8 @@
     "2026-10-15T15:30:00Z",
     "2026-10-16T07:30:00Z",
     "2026-10-16T13:30:00Z",
-    "2026-10-16T15:30:00Z"
+    "2026-10-16T15:30:00Z",
+    "2026-10-17T07:30:00Z"
   ],
   "pending_comments": {
     "gsSIIR9k-pY": {
@@ -3701,6 +3702,10 @@
     "SkzJqTO4KeA": {
       "source_id": "Fx-mY1zsK7o",
       "title": "\u0917\u0902\u0917\u093e \u0915\u0947 \u0932\u0939\u0930\u093f\u092f\u093e \u090f\u0915 \u0906\u0908 \u0917\u0907\u0932\u0940 | \u0926\u0947\u0935\u0940 \u092d\u091c\u0928 | Devi Maa Bhakti Geet | Maa Durga Songs 2025"
+    },
+    "r1hfOoFogZw": {
+      "source_id": "Y40ykUWDkdw",
+      "title": "\u0932\u093f\u092a\u0932 \u092a\u094b\u0924\u0932 \u0915\u094b\u0920\u093e\u0930\u093f\u092f\u093e, \u091b\u0920\u0940 \u092e\u093e\u0908 | Bhakti geet | Chatt geet | Manju Lokgeet"
     }
   },
   "commented_video_ids": [
