@@ -126,10 +126,10 @@
     "3iWDQtGqWzE",
     "VTJsv1Vkfv8",
     "N2qRdnvFwuA",
-    "aEJuqrdU31g"
+    "aEJuqrdU31g",
+    "l-BitwmfnwI"
   ],
   "scheduled_slots": [
-    "2026-09-21T07:30:00Z",
     "2026-09-21T13:30:00Z",
     "2026-09-21T15:30:00Z",
     "2026-09-22T07:30:00Z",
@@ -211,7 +211,8 @@
     "2026-10-17T13:30:00Z",
     "2026-10-17T15:30:00Z",
     "2026-10-18T07:30:00Z",
-    "2026-10-18T13:30:00Z"
+    "2026-10-18T13:30:00Z",
+    "2026-10-18T15:30:00Z"
   ],
   "pending_comments": {
     "gsSIIR9k-pY": {
@@ -3701,6 +3702,10 @@
     "X4LF6w8i5m0": {
       "source_id": "aEJuqrdU31g",
       "title": "Mandir Mein Sute Hanuman Ji | Bhojpuri Hanuman Ji Bhajan | Manju Lokgeet | Hanuman Bhakti Geet"
+    },
+    "jsysHqUx478": {
+      "source_id": "l-BitwmfnwI",
+      "title": "Bhojpuri Shiv Bhajan: Dam Dam Damru Bajave Bhole | Navratri 2025"
     }
   },
   "commented_video_ids": [
