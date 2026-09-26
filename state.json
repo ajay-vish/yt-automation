@@ -139,10 +139,10 @@
     "H-9phwRZiVE",
     "MLq1twIO6zI",
     "few518ghi7E",
-    "s_RgzOtW3HQ"
+    "s_RgzOtW3HQ",
+    "AjQUEB7juy4"
   ],
   "scheduled_slots": [
-    "2026-09-26T07:30:00Z",
     "2026-09-26T13:30:00Z",
     "2026-09-26T15:30:00Z",
     "2026-09-27T07:30:00Z",
@@ -222,7 +222,8 @@
     "2026-10-21T15:30:00Z",
     "2026-10-22T07:30:00Z",
     "2026-10-22T13:30:00Z",
-    "2026-10-22T15:30:00Z"
+    "2026-10-22T15:30:00Z",
+    "2026-10-23T07:30:00Z"
   ],
   "pending_comments": {
     "gsSIIR9k-pY": {
@@ -3704,6 +3705,10 @@
     "cWJf_bXaFDo": {
       "source_id": "s_RgzOtW3HQ",
       "title": "Ganesh chaturthi special geet || \u0917\u0923\u0947\u0936 \u091a\u0924\u0941\u0930\u094d\u0925\u0940 \u0935\u093f\u0936\u0947\u0937 \u0917\u0940\u0924 #ganeshchaturthi"
+    },
+    "3bCi63stkvg": {
+      "source_id": "AjQUEB7juy4",
+      "title": "\u091b\u0920\u0940 \u092e\u0908\u092f\u093e \u0921\u094b\u0932\u0940 \u091a\u0922\u093c \u0905\u0907\u0932\u0940 \u0932\u093e\u0932 \u092a\u093f\u092f\u0930 \u0913\u0922\u093c\u093e\u0908 | Chatt mata ji ka geet | Manju Lokgeet #chatt #\u091b\u0920"
     }
   },
   "commented_video_ids": [
