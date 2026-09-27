@@ -144,10 +144,10 @@
     "5vIN-zy5mn8",
     "aHgGtl66HPI",
     "GJS6x7xJMKY",
-    "DM_XftCxXy4"
+    "DM_XftCxXy4",
+    "xBvmB3XZTuc"
   ],
   "scheduled_slots": [
-    "2026-09-27T15:30:00Z",
     "2026-09-28T07:30:00Z",
     "2026-09-28T13:30:00Z",
     "2026-09-28T15:30:00Z",
@@ -227,7 +227,8 @@
     "2026-10-23T13:30:00Z",
     "2026-10-23T15:30:00Z",
     "2026-10-24T07:30:00Z",
-    "2026-10-24T13:30:00Z"
+    "2026-10-24T13:30:00Z",
+    "2026-10-24T15:30:00Z"
   ],
   "pending_comments": {
     "gsSIIR9k-pY": {
@@ -3705,6 +3706,10 @@
     "D9AbyjihOvA": {
       "source_id": "DM_XftCxXy4",
       "title": "Amawa Ke Dadhiya Pe Bole Koyaliya - Bhojpuri Lokgeet"
+    },
+    "VNS-5EE0QbM": {
+      "source_id": "xBvmB3XZTuc",
+      "title": "Raha dashrath ji ke aarati sajav ho sakhi | Dashrath bhavan | Ayodhya | Manju Lokgeet"
     }
   },
   "commented_video_ids": [
