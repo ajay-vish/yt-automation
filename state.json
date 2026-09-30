@@ -150,11 +150,10 @@
     "dlZF-lj0nZA",
     "zwbKdNHq0gY",
     "0UbGfIutyGA",
-    "3orVlFcdCFQ"
+    "3orVlFcdCFQ",
+    "6vdnkclAMb0"
   ],
   "scheduled_slots": [
-    "2026-09-30T13:30:00Z",
-    "2026-09-30T15:30:00Z",
     "2026-10-01T07:30:00Z",
     "2026-10-01T13:30:00Z",
     "2026-10-01T15:30:00Z",
@@ -231,7 +230,8 @@
     "2026-10-25T13:30:00Z",
     "2026-10-25T15:30:00Z",
     "2026-10-26T07:30:00Z",
-    "2026-10-26T13:30:00Z"
+    "2026-10-26T13:30:00Z",
+    "2026-10-26T15:30:00Z"
   ],
   "pending_comments": {
     "gsSIIR9k-pY": {
@@ -3697,6 +3697,10 @@
     "-Y_QosetHas": {
       "source_id": "3orVlFcdCFQ",
       "title": "Jode Jode Falwa Suruj Dev | \u091c\u094b\u0921\u093c\u0947 \u091c\u094b\u0921\u093c\u0947 \u092b\u0932\u0935\u093e \u0938\u0942\u0930\u091c \u0926\u0947\u0935 | Chhath Geet 2025"
+    },
+    "hAf_4HnQtcI": {
+      "source_id": "6vdnkclAMb0",
+      "title": "\u0915\u093e \u0926\u0947\u0915\u0947 \u0936\u093f\u0935 \u0915\u0947 \u092e\u0928\u093e\u0907\u092c \u0939\u094b, \u0936\u093f\u0935 \u092e\u093e\u0928\u0924 \u0928\u0939\u0940\u0902 | Itahiya | Shiv ji ka geet | Manju Lokgeet"
     }
   },
   "commented_video_ids": [
