@@ -12,12 +12,12 @@ WORK_DIR = Path("work")
 CLIP_SECONDS_RANGE = (15, 22)
 SHORT_WIDTH, SHORT_HEIGHT = 1080, 1920
 
-# --- UPDATED STYLING FOR CONCEPT 1 ---
+# --- STYLING FOR CONCEPT 1 ---
 TITLE_FONT_FILE = WORK_DIR / "Mukta-Bold.ttf"
 TITLE_FONT_SIZE = 60
-TITLE_COLOR = "white"         # Clean white modern text
+TITLE_COLOR = "white"
 TITLE_OUTLINE_COLOR = "black"
-TITLE_OUTLINE_WIDTH = 2         # Thinner outline for elegance
+TITLE_OUTLINE_WIDTH = 2
 TITLE_SHADOW_COLOR = "black@0.6"
 TITLE_SHADOW_X = TITLE_SHADOW_Y = 5
 TITLE_Y_START = 230
@@ -31,7 +31,6 @@ BRANDING_PATH = _REPO_ROOT / "assets" / "Branding.png"
 CALLOUT_PATH = _REPO_ROOT / "assets" / "callout.png"
 GIF_START, GIF_END = 5, 9
 
-# Callout overlay settings
 CALLOUT_WIDTH = 450
 CALLOUT_Y = 60
 CALLOUT_CORNER_RADIUS = 10
@@ -44,11 +43,13 @@ SLOT_TIMES_IST = [(13, 0), (19, 0), (21, 0)]
 SLOT_SEARCH_DAYS = 30
 
 DEFAULT_LANGUAGE = "hi"
-DEFAULT_AUDIO_LANGUAGE = "hi"
+DEFAULT_AUDIO_LANGUAGE = "bho"
+
+# Updated base tags to include high-intent Devanagari folk queries
 BASE_TAGS = [
-    "bhojpuri", "bhojpuri song", "bhojpuri lokgeet", "lokgeet",
-    "bhojpuri folk song", "indian folk music", "bihar", "up bhojpuri",
-    "purvanchal", "bhojpuri bhajan", "bhojpuri diaspora",
+    "bhojpuri lokgeet", "पारंपरिक लोकगीत", "bhojpuri folk song", 
+    "vivah geet", "विवाह गीत", "purvanchal lokgeet", "up bihar geet", 
+    "dehati lokgeet", "manju vishwakarma", "bhojpuri bhakti"
 ]
 
 
@@ -181,7 +182,6 @@ def find_best_window(wav_path: Path, clip_seconds: int) -> float:
 
 
 def download_font(dest_path: Path):
-    # Swapped to Mukta: beautiful sans-serif that supports both Hindi (Devanagari) & English
     url = "https://github.com/google/fonts/raw/main/ofl/mukta/Mukta-Bold.ttf"
     req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
     with urllib.request.urlopen(req) as response, open(dest_path, "wb") as f:
@@ -209,17 +209,15 @@ def cut_and_reframe(video_path: Path, start: float, clip_seconds: int, out_path:
     display_title = title.split("#")[0].strip() if title else ""
 
     fg_width = SHORT_WIDTH - 25
-    fg_height = SHORT_WIDTH - 25  # 1:1 square
-    radius = 30  # Rounded corner radius
+    fg_height = SHORT_WIDTH - 25
+    radius = 30
 
-    # 1. Background: Blurred + 5% Black overlay (Frosted Glass)
     bg_vf = (
         f"[0:v]trim=start={start}:duration={clip_seconds},setpts=PTS-STARTPTS,"
         f"scale={SHORT_WIDTH}:{SHORT_HEIGHT}:force_original_aspect_ratio=increase,crop={SHORT_WIDTH}:{SHORT_HEIGHT},"
         f"boxblur=20:5,drawbox=x=0:y=0:w=iw:h=ih:color=black@0.05:t=fill[bg_dark]"
     )
 
-    # 2. Foreground: Square cropped center video with rounded corners via Alpha Mask
     fg_vf = (
         f"[0:v]trim=start={start}:duration={clip_seconds},setpts=PTS-STARTPTS,"
         f"scale={fg_width}:{fg_height}:force_original_aspect_ratio=increase,crop={fg_width}:{fg_height},"
@@ -229,11 +227,7 @@ def cut_and_reframe(video_path: Path, start: float, clip_seconds: int, out_path:
         f"if(lte(hypot({radius}-(W/2-abs(W/2-X)),{radius}-(H/2-abs(H/2-Y))),{radius}),255,0),255)'[fg_round]"
     )
 
-    # 3. No Drop Shadow: Overlay FG directly onto bg_dark
-    shadow_vf = (
-        f"[bg_dark][fg_round]overlay=(W-w)/2:(H-h)/2[base]"
-    )
-
+    shadow_vf = f"[bg_dark][fg_round]overlay=(W-w)/2:(H-h)/2[base]"
     base_vf = f"{bg_vf};{fg_vf};{shadow_vf}"
 
     title_vf_parts = []
@@ -333,59 +327,67 @@ def generate_metadata(source_id: str, source_title: str, transcript: str) -> tup
         raise RuntimeError("GEMINI_API_KEY env var is not set.")
 
     client = genai.Client(api_key=api_key)
-    prompt = (
-        f'You are an expert YouTube Shorts strategist for a Bhojpuri folk songs (lokgeet) channel, '
-        f'skilled at writing titles that match what currently trends and ranks well in this niche.\n\n'
-        f'Source song: "{source_title}"\n'
-        f'Full video: https://www.youtube.com/watch?v={source_id}\n\n'
-        f'Transcript of the Short clip (Hindi/Bhojpuri, may have errors):\n"{transcript.strip()}"\n\n'
-        f'Before writing, think about how top-performing Bhojpuri/Indian folk music Shorts titles are '
-        f'usually written: they front-load the song or singer name (high search volume terms), use '
-        f'emotional or curiosity-driving phrases (e.g. "dil dhoom", "sabse hit", "bewafa", "viral"), '
-        f'keep it short enough to not get cut off on mobile, and match common search phrasing '
-        f'("bhojpuri new song", "bhojpuri lokgeet 2025", singer name + song name) rather than generic wording.\n\n'
-        f'Return a JSON object with exactly these three keys:\n'
-        f'  "title" - under 100 characters. Lead with the strongest hook (song name, singer, or '
-        f'emotional phrase) in the first few words since that is what shows in search/suggested feeds. '
-        f'Format: Song Name - Singer | Bhojpuri Folk Song #Shorts (adapt wording for higher CTR while '
-        f'keeping it truthful to the clip)\n'
-        f'  "description" - 3-5 lines: song name, one evocative/emotional line that encourages watching '
-        f'the full video, the full video link (https://www.youtube.com/watch?v={source_id}), then a '
-        f'final line with 8-10 hashtags for maximum discovery: always include #Shorts, #Bhojpuri, '
-        f'#Lokgeet, and #BhojpuriSong, plus a region hashtag (#Bihar, #UP, or #Purvanchal), plus 3-4 '
-        f'more specific ones from the song itself (singer name, occasion/festival if mentioned e.g. '
-        f'#Vivah #Bhakti #Shaadi, or genre like #FolkMusic #DesiMusic)\n'
-        f'  "tags" - JSON array of 15-20 strings optimized for YouTube search ranking: mix broad '
-        f'high-volume terms (bhojpuri, bhojpuri song, folk song, lokgeet, indian folk music, bhojpuri '
-        f'new song), regional terms (bihar, up bhojpuri, purvanchal), and specific terms (song name, '
-        f'singer name in full and common misspellings, occasion). Order tags roughly by expected search '
-        f'volume, highest first.\n\n'
-        f'Return only valid JSON - no markdown fences, no explanation.'
-    )
+
+    prompt = f"""You are an elite YouTube growth strategist specializing in regional Indian folk music (Bhojpuri Lokgeet, Vivah Geet, Bhakti Geet) popular in Eastern UP and Bihar.
+
+Input Information:
+Source Video Title: "{source_title}"
+Full Video URL: https://www.youtube.com/watch?v={source_id}
+Clip Audio/Transcript (in Hindi/Bhojpuri):
+"{transcript.strip()}"
+
+REQUIREMENTS:
+1. "title":
+   - Target length: 45 to 65 characters (MUST BE under 70 characters so it fits on mobile screens).
+   - MUST front-load Hindi Devanagari script: Start with the emotional hook or first words of the song lyrics (Mukhda), followed by the specific ritual in Hindi (e.g. बेटी विदाई गीत, समधी गारी, सोहर, मटकोर, पचरा).
+   - Format: [Hindi Lyric Hook / Mukhda] | [Ritual Name in Hindi] #Shorts
+   - Do NOT start with English words or singer names.
+
+2. "description":
+   - Line 1: Short 1-sentence emotional or cultural context in Hindi stating the song's occasion.
+   - Line 2-3: 2 to 3 lines of the actual Bhojpuri/Hindi lyrics snippet from the clip.
+   - Line 4: Call to action: पूरा गीत सुनने के लिए यहाँ क्लिक करें 👇
+   - Line 5: https://www.youtube.com/watch?v={source_id}
+   - Line 6: 6-8 relevant hashtags like #Shorts #BhojpuriLokgeet #VivahGeet #Purvanchal #ManjuLokgeet
+
+3. "tags":
+   - An array of 15 to 18 high-intent tags.
+   - Mix Devanagari and Latin script (e.g., "विवाह गीत", "bhojpuri vivah geet", "पारंपरिक लोकगीत", "vidai geet", "bhojpuri lokgeet 2026", "eastern up geet").
+   - Do NOT include modern dance/DJ singers (e.g. Pawan Singh, Khesari).
+
+Return strictly a JSON object with keys: "title", "description", "tags"."""
 
     response = client.models.generate_content(
-        model="gemini-2.5-flash", contents=prompt,
+        model="gemini-2.5-flash",
+        contents=prompt,
         config=types.GenerateContentConfig(response_mime_type="application/json"),
     )
     data = json.loads(response.text)
+    
+    title = str(data.get("title", "")).strip()
+    if not title or len(title) > 100:
+        clean_name = source_title.split("|")[0].strip()
+        title = f"{clean_name} | पारंपरिक लोकगीत #Shorts"[:70]
+
     return (
-        str(data.get("title", source_title))[:100],
+        title[:70],
         str(data.get("description", "")),
-        [str(t) for t in data.get("tags", [])][:20],
+        [str(t).strip() for t in data.get("tags", []) if str(t).strip()][:20],
     )
 
 
-def build_fallback_prompt(source_id: str, source_title: str, transcript: str) -> str:
-    return (
-        f'I run a YouTube channel of Bhojpuri folk songs (lokgeet). I\'ve made a Short from this song: '
-        f'"{source_title}" (full video: https://www.youtube.com/watch?v={source_id}).\n\n'
-        f'Transcript of the clip (Hindi/Bhojpuri, may contain errors):\n"{transcript.strip()}"\n\n'
-        f'Please give me a TITLE (under 100 chars, format: Song Name - Singer | Bhojpuri Folk Song #Shorts), '
-        f'a DESCRIPTION (3-5 lines with song name, an evocative line, the video link, then a final '
-        f'line of 8-10 hashtags - always #Shorts #Bhojpuri #Lokgeet #BhojpuriSong, a region hashtag '
-        f'like #Bihar/#UP/#Purvanchal, and 3-4 more specific ones from the singer, occasion, or genre), '
-        f'and 15-20 comma-separated TAGS mixing broad and specific terms.'
+def build_fallback_metadata(source_id: str, source_title: str) -> tuple[str, str, list[str]]:
+    """Safe fallback that avoids using [DRAFT] if the API ever fails."""
+    clean_title = source_title.split("|")[0].split("-")[0].strip()
+    fallback_title = f"{clean_title} | पारंपरिक भोजपुरी लोकगीत #Shorts"[:70]
+    
+    fallback_desc = (
+        f"पारंपरिक भोजपुरी लोकगीत - {clean_title}\n\n"
+        f"पूरा गीत सुनने के लिए यहाँ क्लिक करें 👇\n"
+        f"https://www.youtube.com/watch?v={source_id}\n\n"
+        f"#Shorts #BhojpuriLokgeet #FolkSong #Purvanchal #ManjuLokgeet"
     )
+    return fallback_title, fallback_desc, BASE_TAGS
 
 
 def merge_tags(ai_tags: list[str]) -> list[str]:
@@ -441,7 +443,7 @@ def upload_private(video_path: Path, title: str, description: str, tags: list[st
 def main():
     state = load_state()
 
-    # Guard rail: check slot availability before spending time or API quota
+    # Guard rail: check slot availability before downloading or processing
     try:
         publish_at = get_next_available_slot(state)
         print(f"[Guard Rail] Target publish slot reserved: {publish_at} (UTC)")
@@ -474,14 +476,12 @@ def main():
     final_path = WORK_DIR / f"{video_id}_final.mp4"
     burn_captions(clip_path, srt_path, final_path)
 
-    # --- Get AI metadata ---
+    # --- Generate AI metadata with safe fallbacks ---
     try:
         ai_title, ai_description, ai_tags = generate_metadata(video_id, title, transcript)
     except Exception as exc:
-        print(f"WARNING: Gemini failed ({exc}). Falling back to draft.")
-        ai_title = f"[DRAFT] {title[:80]}"
-        ai_description = build_fallback_prompt(video_id, title, transcript)
-        ai_tags = []
+        print(f"WARNING: Gemini generation failed ({exc}). Using clean fallback metadata.")
+        ai_title, ai_description, ai_tags = build_fallback_metadata(video_id, title)
 
     ai_tags = merge_tags(ai_tags)
     uploaded_id = upload_private(final_path, ai_title, ai_description, ai_tags, publish_at=publish_at)
