@@ -9,7 +9,7 @@ import numpy as np
 CHANNEL_URL = "https://www.youtube.com/@manjuvishwakarmalokgeet/videos"
 STATE_FILE = Path("state.json")
 WORK_DIR = Path("work")
-CLIP_SECONDS_RANGE = (15, 22)
+CLIP_SECONDS_RANGE = (8, 10)
 SHORT_WIDTH, SHORT_HEIGHT = 1080, 1920
 
 # --- STYLING FOR CONCEPT 1 ---
